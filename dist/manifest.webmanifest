@@ -1,0 +1,14 @@
+{
+  "name": "PF2e Spellbook",
+  "short_name": "Spellbook",
+  "description": "Interactive Pathfinder 2e spellbook — prepare, browse, and track your spells offline.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1b130c",
+  "theme_color": "#2b1d12",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

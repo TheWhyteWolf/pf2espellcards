@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2b1d12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Spellbook">
+<meta name="description" content="An interactive Pathfinder 2e spellbook: prepare, browse, and track your spells.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<!-- PWA: present alongside index.html on the hosted (GitHub Pages) copy; harmlessly
+     absent when this file is downloaded and opened on its own. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>PF2e Spellbook</title>
+<style>
+/*__INJECT_STYLES__*/
+</style>
+</head>
+<body>
+
+<header class="top hide">
+  <div class="tophead">
+    <h1><span id="charIcon">📖</span> <span id="charNameHead">Spellbook</span></h1>
+    <button class="menubtn" onclick="openMenu()" title="Characters &amp; backup" aria-label="Characters menu">👤</button>
+  </div>
+  <div class="sub" id="charSub">Pathfinder 2e (Remaster)</div>
+  <div class="statbar" id="statbar">
+    <div class="stat"><div class="lbl">Spell DC</div><div class="val" id="stDC">—</div></div>
+    <div class="stat"><div class="lbl">Spell Atk</div><div class="val" id="stAtk">—</div></div>
+    <div class="stat"><div class="lbl">Level</div><div class="val" id="stLvl">—</div></div>
+  </div>
+</header>
+
+<!-- ================= CLASS PICKER ================= -->
+<section id="view-classpick" class="wrap hide"></section>
+
+<!-- ================= CHARACTER MENU ================= -->
+<section id="view-menu" class="wrap hide">
+  <h2>📲 Use offline</h2>
+  <p class="meta">Everything you do — your characters and prepared spells — is saved <b>on this device only</b>, in your browser. Nothing is sent anywhere. Keep a copy so it always works, even with no signal:</p>
+  <div class="row">
+    <button class="btn" onclick="downloadOffline()">📥 Save offline copy</button>
+    <button class="btn secondary" id="installBtn" style="display:none" onclick="installApp()">⬇ Install app</button>
+  </div>
+  <p class="meta" id="offlineHint" style="font-size:.8rem">“Save offline copy” downloads this whole spellbook as a single file you can open any time — no internet needed. “Install app” adds it to your home screen like a normal app (appears when your browser supports it).</p>
+
+  <h2 style="margin-top:24px">Characters</h2>
+  <p class="meta">Tap a character to switch to it. You can keep as many as you like — each remembers its own prepared spells.</p>
+  <div id="menuList"></div>
+  <button class="btn" onclick="newCharacter()">＋ New character</button>
+
+  <h2 style="margin-top:24px">Share &amp; back up</h2>
+  <p class="meta">Export your <b>active</b> character to a code you can save or send to a friend. To load one, paste a code below and tap Import — it's added as a new character.</p>
+  <div class="row">
+    <button class="btn secondary" onclick="exportCharacter()">⬆ Export active</button>
+    <button class="btn secondary" onclick="importCharacter()">⬇ Import code</button>
+  </div>
+  <textarea id="menuIO" rows="3" placeholder="Character code appears here on Export — or paste one here, then tap Import."></textarea>
+  <button class="btn secondary" onclick="closeMenu()">← Back</button>
+  <p class="meta" style="text-align:center;margin-top:18px;font-size:.8rem">Spell data: Paizo (OGL/ORC) via the Foundry VTT pf2e project · unofficial fan tool<br><span id="dataStamp"></span></p>
+</section>
+
+<!-- ================= TODAY ================= -->
+<section id="view-today" class="wrap hide">
+  <div id="todayEmpty" class="empty">
+    <h2>No spells prepared yet</h2>
+    <p>Head to <b>Prepare</b> to set up your spells for the day, then come back here during play.</p>
+    <button class="btn" onclick="go('prepare')">Go to Prepare →</button>
+  </div>
+  <div id="todayContent" class="hide"></div>
+</section>
+
+<!-- ================= PREPARE / REPERTOIRE ================= -->
+<section id="view-prepare" class="wrap hide">
+  <p class="meta" id="prepClassLine"></p>
+  <div class="banner hide" id="prepPreviewBanner">ℹ️ Spell slots, cantrips, and focus spells are fully tracked. A few subclass extras (blood magic, oracular curse, companions/familiars) stay on your character sheet — noted below where relevant.</div>
+
+  <h2>① Your character</h2>
+  <p class="meta">Copy these from your character sheet.</p>
+
+  <label class="field">
+    <span class="name">Character name</span>
+    <input type="text" id="inName" placeholder="e.g. Brother Aldric">
+  </label>
+
+  <div class="row">
+    <label class="field">
+      <span class="name">Level</span>
+      <select id="inLevel"></select>
+    </label>
+    <label class="field">
+      <span class="name" id="keyAbilityName">Key ability mod</span>
+      <span class="hint">spellcasting ability</span>
+      <select id="inKey"></select>
+    </label>
+  </div>
+
+  <!-- font (cleric) / bloodline (sorcerer) / patron tradition (witch) -->
+  <div id="charExtra"></div>
+
+  <div class="card" id="prepSummary"></div>
+
+  <h2 id="prepDynamicHead">② Prepare your spells</h2>
+  <div id="prepDynamic"></div>
+
+  <button class="btn" onclick="savePrep()">✓ Save for the day</button>
+  <button class="btn secondary" onclick="go('today')">Cancel</button>
+</section>
+
+<!-- ================= BROWSE ================= -->
+<section id="view-browse" class="wrap hide">
+  <h2 id="browseTitle">All spells</h2>
+  <input type="text" id="search" placeholder="🔍 Search spells…" oninput="renderBrowse()">
+  <div class="filterbar" id="rankChips"></div>
+  <button class="chip" id="filterToggle" onclick="toggleBrowseFilters()" aria-expanded="false">⚙ Filters</button>
+  <div id="browseFilters" class="hide"></div>
+  <div id="browseList"></div>
+</section>
+
+<!-- ================= HELP ================= -->
+<section id="view-help" class="wrap hide">
+  <h2>Help — <span id="helpClassName">your class</span></h2>
+  <p class="meta">A quick guide to everything on this app.</p>
+  <div id="helpContent"></div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<nav class="bottom hide">
+  <button id="nav-today" class="on" onclick="go('today')"><span class="ic">📜</span>Cast Today</button>
+  <button id="nav-prepare" onclick="go('prepare')"><span class="ic">🌅</span>Prepare</button>
+  <button id="nav-browse" onclick="go('browse')"><span class="ic">📖</span>All Spells</button>
+  <button id="nav-help" onclick="go('help')"><span class="ic">❓</span>Help</button>
+</nav>
+
+<script>
+/*__INJECT_DATA__*/
+</script>
+<script>
+/*__INJECT_OVERRIDES__*/
+</script>
+<script>
+/*__INJECT_ALIASES__*/
+</script>
+<script>
+/*__INJECT_CLASSES__*/
+</script>
+<script>
+/*__INJECT_ENGINE__*/
+</script>
+</body>
+</html>

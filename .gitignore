@@ -1,0 +1,12 @@
+node_modules/
+*.log
+.DS_Store
+__pycache__/
+*.pyc
+
+# editor / local settings
+.claude/
+
+# local scratch & downloaded reference material (not part of the project)
+/Licenses - Archives of Nethys*
+/FoundryVTT-*.zip

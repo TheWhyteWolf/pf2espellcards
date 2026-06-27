@@ -1,0 +1,23 @@
+{
+  "name": "pf2e-spellbook",
+  "version": "1.0.0",
+  "description": "Interactive Pathfinder 2e spellbook (single self-contained HTML).",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "files": [
+    "src/",
+    "tools/",
+    "data/",
+    "dist/",
+    "notice.md"
+  ],
+  "scripts": {
+    "build": "python3 tools/build.py",
+    "build:data": "python3 tools/build_spells.py --src \"$PF2E_DATA/packs/pf2e/spells\" --out data/spells.generated.js",
+    "test": "node tools/test.mjs",
+    "check": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}
