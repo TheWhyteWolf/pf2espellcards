@@ -297,6 +297,13 @@ ok(JSON.stringify(w.classSlots(7)) === "{\"3\":2,\"4\":2}", "summoner shares the
 ok(w.hasFocus() && w.classFocusSpells().length > 0, "summoner has evolution focus spells");
 w.go("prepare");
 ok(!!d.querySelector("#inPatron") && /Eidolon/.test(d.getElementById("charExtra").textContent), "summoner shows the Eidolon's-tradition picker");
+// regression: a partial caster's shed low ranks must not render phantom "known" rows (repertoire == slots)
+ev("state.level=7"); w.go("prepare");
+const sumRepGroups = [...d.querySelectorAll("[data-reprank]")];
+const sumRepRows = d.querySelectorAll(".repSel").length;
+ok(sumRepGroups.length === 2, `summoner L7 repertoire shows only its 2 slotted ranks (got ${sumRepGroups.length})`);
+ok(sumRepRows === 4, `summoner L7 repertoire rows == its 4 slots, no phantom low ranks (got ${sumRepRows})`);
+ok(sumRepGroups.every(g => +g.dataset.reprank >= 3), "summoner L7 repertoire has no rank-1/2 phantom groups");
 
 console.log("\n# PSYCHIC (occult spontaneous, 2 slots/rank, full prof)");
 w.chooseClass("psychic");
@@ -310,8 +317,20 @@ ev("state.level=19; state.keyMod=5;");
 ok(w.spellDC() === 42, `psychic L19 DC = 42 (legendary; got ${w.spellDC()})`);
 ok(w.hasFocus() && w.classFocusSpells().some(s => s.slug === "imaginary-weapon"), "psychic surfaces psi cantrips in the focus section (e.g. Imaginary Weapon)");
 
-console.log("\n# class picker now lists all 10");
-ok(ev("CLASS_ORDER.length") === 10, "class picker offers all 10 classes");
+console.log("\n# ANIMIST (divine prepared full caster + apparitions)");
+ok(ev('CLASS_ORDER.includes("animist")') && !!ev('CLASSES.animist'), "animist registered in the class picker");
+w.chooseClass("animist");
+ok(!w.isSpontaneous() && w.activeClass().keyAbility === "Wisdom", "animist = prepared, Wisdom");
+ok(w.activeTradition() === "divine", "animist casts the divine tradition");
+ok(w.classSlots(1)[1] === 2 && w.classSlots(19)[10] === 1, "animist uses the full-caster slot table (2× rank 1 at L1; 10th rank at L19)");
+ev("state.level=19; state.keyMod=5;");
+ok(w.spellDC() === 42, `animist L19 DC = 42 (legendary full caster; got ${w.spellDC()})`);
+ok(w.hasFocus() && w.classFocusSpells().length > 0, `animist surfaces vessel/apparition focus spells (${w.classFocusSpells().length})`);
+ev("state.level=5"); w.go("prepare");
+ok(d.querySelectorAll(".slotSel").length > 0 && d.querySelectorAll(".repSel").length === 0, "animist prepares into slots, not a repertoire");
+
+console.log("\n# class picker now lists all 11");
+ok(ev("CLASS_ORDER.length") === 11, "class picker offers all 11 classes");
 
 console.log("\n# LEGACY / REMASTER compatibility");
 // every spell has a legacy array; aliases resolve to real spells

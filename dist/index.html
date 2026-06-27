@@ -58948,10 +58948,26 @@ const CLASSES={
        "You get only two slots per rank (one for a newly-gained rank), so cantrips and Amps carry much of your output. Mark signature spells to heighten them into higher slots."],
     ],
   },
+
+  /* ---------------- ANIMIST ---------------- */
+  animist:{
+    id:"animist", name:"Animist", icon:"🕯️",
+    tagline:"Divine prepared caster · channels apparitions (spirits)",
+    tradition:"divine", keyAbility:"Wisdom", keyAbilityShort:"Wis",
+    casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:4,
+    preview:true,
+    features:[{type:"note", title:"Apparitions & vessel spells", text:"You prepare divine spells; your attuned apparitions grant a vessel focus spell (add the ones you know in the Focus section below) and a separate spontaneous repertoire of apparition spells that stays on your character sheet."}],
+    help:[
+      ["What does an animist do?",
+       "You're a <b>Divine</b> prepared caster who channels <b>apparitions</b> — spirits that lend you power. You prepare divine spells like a cleric, and your attuned apparitions grant extra spells plus a <b>vessel</b> focus spell. The app tracks your divine slots, cantrips and DC; apparition attunement and the apparition repertoire stay on your sheet (coming soon)."],
+      ["Cantrips & apparitions",
+       "You know <b>4 cantrips</b> — two you choose plus two granted by your attuned apparitions. Your <b>vessel</b> focus spell (from your primary apparition) appears in the Focus section; cast it with Focus Points like other focus spells."],
+    ],
+  },
 };
 
 /* Order shown in the class picker. */
-const CLASS_ORDER=["cleric","wizard","druid","witch","sorcerer","bard","oracle","magus","summoner","psychic"];
+const CLASS_ORDER=["cleric","wizard","druid","witch","sorcerer","bard","oracle","magus","summoner","psychic","animist"];
 
 </script>
 <script>
@@ -59609,7 +59625,8 @@ function repertoireHTML(){
   let html=`<p class="meta">Add the spells your character knows of each rank. ★ marks a <b>signature spell</b> (castable in higher slots). There's no fixed limit here — match your character sheet.</p>`;
   for(let r=hr;r>=1;r--){
     const known=prevRep[r]||[];
-    const count=Math.max(known.length, slots[r]||1);
+    const count=Math.max(known.length, slots[r]||0);
+    if(!count) continue;   // no slots of this rank (e.g. a summoner's shed low ranks) → no repertoire of that rank
     html+=`<div class="slotgroup" data-reprank="${r}">
       <h3>📜 Rank ${r} spells known <span class="count" style="font-weight:600;color:var(--muted)">(${slots[r]||0} slot${(slots[r]||0)===1?"":"s"}/day)</span></h3>
       <div class="repRows" id="repRows-${r}">`;

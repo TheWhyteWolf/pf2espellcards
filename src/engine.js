@@ -652,7 +652,8 @@ function repertoireHTML(){
   let html=`<p class="meta">Add the spells your character knows of each rank. ★ marks a <b>signature spell</b> (castable in higher slots). There's no fixed limit here — match your character sheet.</p>`;
   for(let r=hr;r>=1;r--){
     const known=prevRep[r]||[];
-    const count=Math.max(known.length, slots[r]||1);
+    const count=Math.max(known.length, slots[r]||0);
+    if(!count) continue;   // no slots of this rank (e.g. a summoner's shed low ranks) → no repertoire of that rank
     html+=`<div class="slotgroup" data-reprank="${r}">
       <h3>📜 Rank ${r} spells known <span class="count" style="font-weight:600;color:var(--muted)">(${slots[r]||0} slot${(slots[r]||0)===1?"":"s"}/day)</span></h3>
       <div class="repRows" id="repRows-${r}">`;

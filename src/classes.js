@@ -290,7 +290,23 @@ const CLASSES={
        "You get only two slots per rank (one for a newly-gained rank), so cantrips and Amps carry much of your output. Mark signature spells to heighten them into higher slots."],
     ],
   },
+
+  /* ---------------- ANIMIST ---------------- */
+  animist:{
+    id:"animist", name:"Animist", icon:"🕯️",
+    tagline:"Divine prepared caster · channels apparitions (spirits)",
+    tradition:"divine", keyAbility:"Wisdom", keyAbilityShort:"Wis",
+    casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:4,
+    preview:true,
+    features:[{type:"note", title:"Apparitions & vessel spells", text:"You prepare divine spells; your attuned apparitions grant a vessel focus spell (add the ones you know in the Focus section below) and a separate spontaneous repertoire of apparition spells that stays on your character sheet."}],
+    help:[
+      ["What does an animist do?",
+       "You're a <b>Divine</b> prepared caster who channels <b>apparitions</b> — spirits that lend you power. You prepare divine spells like a cleric, and your attuned apparitions grant extra spells plus a <b>vessel</b> focus spell. The app tracks your divine slots, cantrips and DC; apparition attunement and the apparition repertoire stay on your sheet (coming soon)."],
+      ["Cantrips & apparitions",
+       "You know <b>4 cantrips</b> — two you choose plus two granted by your attuned apparitions. Your <b>vessel</b> focus spell (from your primary apparition) appears in the Focus section; cast it with Focus Points like other focus spells."],
+    ],
+  },
 };
 
 /* Order shown in the class picker. */
-const CLASS_ORDER=["cleric","wizard","druid","witch","sorcerer","bard","oracle","magus","summoner","psychic"];
+const CLASS_ORDER=["cleric","wizard","druid","witch","sorcerer","bard","oracle","magus","summoner","psychic","animist"];
