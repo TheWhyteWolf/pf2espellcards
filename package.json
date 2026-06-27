@@ -2,6 +2,11 @@
   "name": "pf2e-spellbook",
   "version": "1.0.0",
   "description": "Interactive Pathfinder 2e spellbook (single self-contained HTML).",
+  "keywords": ["pathfinder", "pf2e", "spellbook", "spells", "ttrpg"],
+  "homepage": "https://thewhytewolf.github.io/pf2espellcards/",
+  "repository": { "type": "git", "url": "git+https://github.com/TheWhyteWolf/pf2espellcards.git" },
+  "bugs": { "url": "https://github.com/TheWhyteWolf/pf2espellcards/issues" },
+  "author": "Whyte",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "files": [
