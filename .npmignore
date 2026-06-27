@@ -1,0 +1,5 @@
+# build artifacts / local cruft — must never ship to the npm tarball
+__pycache__/
+*.pyc
+*.log
+.DS_Store
