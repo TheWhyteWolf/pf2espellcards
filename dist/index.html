@@ -3,168 +3,243 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#2b1d12">
+<meta name="theme-color" content="#14161b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Spellbook">
 <meta name="description" content="An interactive Pathfinder 2e spellbook: prepare, browse, and track your spells.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237b6cf0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M12 6.5C9.5 4.7 6 4.7 3.5 6v13c2.5-1.3 6-1.3 8.5.5 2.5-1.8 6-1.8 8.5-.5V6c-2.5-1.3-6-1.3-8.5.5z'/><path d='M12 6.5v13'/></svg>">
+<!-- Set the light/dark theme before first paint (avoids a flash); the engine reconciles fully on load. -->
+<script>
+(function(){try{
+  var lib=JSON.parse(localStorage.getItem("pf2eSpellbook.v3"))||{};
+  var s=lib.settings||{}, mode=s.themeMode||"auto";
+  if(mode!=="light"&&mode!=="dark") mode=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";
+  var root=document.documentElement; root.dataset.theme=mode;
+  var c=s.custom;
+  if(c){ if(c.accent)root.style.setProperty("--accent",c.accent); if(c.bg)root.style.setProperty("--bg",c.bg);
+    if(c.ink)root.style.setProperty("--ink",c.ink); if(c.surface)root.style.setProperty("--surface",c.surface); }
+}catch(e){}})();
+</script>
 <!-- PWA: present alongside index.html on the hosted (GitHub Pages) copy; harmlessly
      absent when this file is downloaded and opened on its own. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>PF2e Spellbook</title>
 <style>
+/* ============================================================
+   THEME TOKENS
+   Base tokens flip with [data-theme]; --accent (+ --accent-ink) are
+   set by JS per class or per custom palette. Accent shades derive via
+   color-mix(), so one hue recolours the whole UI.
+   ============================================================ */
 :root{
-  --bg:#1b130c;
-  --panel:#2b1d12;
-  --panel2:#33271a;
-  --ink:#f4ead8;
-  --muted:#c9b79a;
-  --gold:#e0b252;
-  --gold-dim:#9c7a36;
-  --heal:#6fc28a;
-  --harm:#c9657a;
-  --line:#4a3a26;
-  --accent:#7fb0d6;
+  /* accent — JS overrides --accent and --accent-ink on <html> */
+  --accent:#6c7a89;
+  --accent-ink:#ffffff;
+  --accent-dim:color-mix(in srgb, var(--accent) 55%, var(--line));
+  --accent-soft:color-mix(in srgb, var(--accent) 15%, transparent);
+  --accent-text:var(--accent);
+
+  /* fixed rank spectrum (left border bars), shared by both modes */
+  --rank0:#b58fd6; --rank1:#7fb0d6; --rank2:#6f9c8f; --rank3:#d6a86f;
+  --rank4:#d68f8f; --rank5:#9cc46a; --rank6:#c9c05a; --rank7:#6fb6d6;
+  --rank8:#c98fd6; --rank9:#d6a0c0; --rank10:var(--accent);
+
   --radius:16px;
-  --tap:#3c2c1b;
 }
+
+/* ---- Dark (default) ---- */
+:root, :root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#14161b;
+  --surface:#1d2027;
+  --surface-2:#262a33;
+  --ink:#e8eaf0;
+  --muted:#9aa1b0;
+  --line:#2f3440;
+  --heal:#5bbf7e;
+  --harm:#d9637a;
+  --info:#6fa8dc;
+  --info-bg:color-mix(in srgb, var(--info) 22%, var(--surface));
+  --info-ink:#d6e8fb;
+  --accent-text:var(--accent);
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.25);
+}
+
+/* ---- Light ---- */
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f5f6f8;
+  --surface:#ffffff;
+  --surface-2:#eef0f4;
+  --ink:#1b1e24;
+  --muted:#5d6470;
+  --line:#dfe3ea;
+  --heal:#2f9e5b;
+  --harm:#c43a57;
+  --info:#2b6cb0;
+  --info-bg:color-mix(in srgb, var(--info) 12%, var(--surface));
+  --info-ink:#0b3a68;
+  --accent-text:color-mix(in srgb, var(--accent) 72%, #000);
+  --shadow:0 1px 2px rgba(20,30,50,.08), 0 4px 14px rgba(20,30,50,.06);
+}
+
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;padding:0;}
+html{background:var(--bg);}
 body{
   background:var(--bg);
   color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  font-size:19px;
+  font-size:18px;
   line-height:1.5;
   padding-bottom:84px; /* room for nav */
   -webkit-text-size-adjust:100%;
 }
-h1,h2,h3{margin:0 0 .4em;line-height:1.2;}
-h1{font-size:1.5rem;color:var(--gold);}
-h2{font-size:1.25rem;color:var(--gold);}
+h1,h2,h3{margin:0 0 .4em;line-height:1.2;letter-spacing:-.01em;}
+h1{font-size:1.5rem;color:var(--ink);font-weight:800;}
+h2{font-size:1.2rem;color:var(--ink);font-weight:700;}
 p{margin:.4em 0;}
 .wrap{max-width:560px;margin:0 auto;padding:16px 14px;}
 .hide{display:none !important;}
 
+/* smooth theme + interaction transitions */
+button,.chip,.card,.cast-card,.classcard,.browse-row,input,select,textarea,
+.stat,nav.bottom button,details.help{
+  transition:background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+
+/* inline SVG icons inherit accent via currentColor */
+.icn{display:inline-block;width:1em;height:1em;flex:0 0 auto;vertical-align:-.14em;}
+
 /* ---- Header ---- */
 header.top{
-  background:linear-gradient(180deg,#3a2715,#241810);
-  border-bottom:2px solid var(--gold-dim);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface));
+  border-bottom:1px solid var(--line);
   padding:14px 16px;
   position:sticky;top:0;z-index:20;
 }
-header.top h1{margin:0;font-size:1.35rem;}
-header.top .sub{color:var(--muted);font-size:.9rem;}
-.statbar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+header.top h1{margin:0;font-size:1.3rem;display:flex;align-items:center;gap:10px;}
+header.top h1 #charIcon{display:inline-flex;color:var(--accent-text);font-size:1.5rem;}
+header.top .sub{color:var(--muted);font-size:.88rem;margin-top:2px;}
+.statbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
 .stat{
-  background:var(--panel2);border:1px solid var(--gold-dim);
-  border-radius:12px;padding:6px 12px;flex:1;min-width:90px;text-align:center;
+  background:var(--surface-2);border:1px solid var(--line);
+  border-radius:12px;padding:8px 12px;flex:1;min-width:90px;text-align:center;
 }
-.stat .lbl{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
-.stat .val{font-size:1.4rem;font-weight:700;color:var(--gold);}
+.stat .lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+.stat .val{font-size:1.4rem;font-weight:800;color:var(--accent-text);}
 
 /* ---- Cards ---- */
 .card{
-  background:var(--panel);
+  background:var(--surface);
   border:1px solid var(--line);
   border-radius:var(--radius);
   padding:16px;margin:14px 0;
-  box-shadow:0 2px 0 rgba(0,0,0,.3);
+  box-shadow:var(--shadow);
 }
-.card.rank0{border-left:6px solid #b58fd6;}
-.card.rank1{border-left:6px solid #7fb0d6;}
-.card.rank2{border-left:6px solid #6f9c8f;}
-.card.rank3{border-left:6px solid #d6a86f;}
-.card.rank4{border-left:6px solid #d68f8f;}
-.card.rank5{border-left:6px solid #b0d67f;}
-.card.rank6{border-left:6px solid #d6cf6f;}
-.card.rank7{border-left:6px solid #6fb6d6;}
-.card.rank8{border-left:6px solid #c98fd6;}
-.card.rank9{border-left:6px solid #d6a0c0;}
-.card.rank10{border-left:6px solid var(--gold);}
-.card.heal{border-left:6px solid var(--heal);}
-.card.harm{border-left:6px solid var(--harm);}
+.card.rank0{border-left:5px solid var(--rank0);}
+.card.rank1{border-left:5px solid var(--rank1);}
+.card.rank2{border-left:5px solid var(--rank2);}
+.card.rank3{border-left:5px solid var(--rank3);}
+.card.rank4{border-left:5px solid var(--rank4);}
+.card.rank5{border-left:5px solid var(--rank5);}
+.card.rank6{border-left:5px solid var(--rank6);}
+.card.rank7{border-left:5px solid var(--rank7);}
+.card.rank8{border-left:5px solid var(--rank8);}
+.card.rank9{border-left:5px solid var(--rank9);}
+.card.rank10{border-left:5px solid var(--rank10);}
+.card.heal{border-left:5px solid var(--heal);}
+.card.harm{border-left:5px solid var(--harm);}
 
 .spell-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
-.spell-name{font-size:1.3rem;font-weight:700;color:var(--ink);margin:0;}
+.spell-name{font-size:1.25rem;font-weight:700;color:var(--ink);margin:0;}
 .rankpill{
-  background:var(--panel2);border:1px solid var(--gold-dim);color:var(--gold);
-  border-radius:20px;padding:3px 12px;font-size:.85rem;font-weight:700;white-space:nowrap;
+  background:var(--surface-2);border:1px solid var(--accent-dim);color:var(--accent-text);
+  border-radius:20px;padding:3px 12px;font-size:.82rem;font-weight:700;white-space:nowrap;
 }
 .actions{
   display:inline-flex;align-items:center;gap:6px;
-  background:#11305a;border:1px solid var(--accent);color:#cfe5f7;
+  background:var(--info-bg);border:1px solid var(--info);color:var(--info-ink);
   border-radius:8px;padding:2px 10px;font-size:.85rem;font-weight:700;margin:8px 8px 4px 0;
 }
 .save-tag{
-  display:inline-block;background:#3a1d1d;border:1px solid #8a4b4b;color:#f0c0c0;
+  display:inline-block;
+  background:color-mix(in srgb, var(--harm) 15%, var(--surface));
+  border:1px solid color-mix(in srgb, var(--harm) 45%, var(--line));
+  color:var(--harm);
   border-radius:8px;padding:2px 10px;font-size:.85rem;font-weight:700;margin:8px 8px 4px 0;
 }
-.meta{font-size:.92rem;color:var(--muted);margin:6px 0;}
+.meta{font-size:.9rem;color:var(--muted);margin:6px 0;}
 .meta b{color:var(--ink);font-weight:600;}
 .traits{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}
 .trait{
-  background:#241810;border:1px solid var(--gold-dim);color:var(--gold);
-  font-size:.74rem;text-transform:uppercase;letter-spacing:.4px;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--muted);
+  font-size:.72rem;text-transform:uppercase;letter-spacing:.4px;
   padding:2px 8px;border-radius:6px;
 }
-.desc{font-size:1.02rem;line-height:1.55;margin-top:8px;}
+.desc{font-size:1rem;line-height:1.55;margin-top:8px;}
 .heighten{
-  margin-top:10px;padding:10px 12px;background:var(--panel2);
-  border-radius:10px;font-size:.95rem;color:var(--muted);
+  margin-top:10px;padding:10px 12px;background:var(--surface-2);
+  border-radius:10px;font-size:.92rem;color:var(--muted);
 }
-.heighten b{color:var(--gold);}
+.heighten b{color:var(--accent-text);}
 
 /* ---- Buttons / inputs ---- */
 button{font-family:inherit;font-size:1.05rem;cursor:pointer;}
 .btn{
-  display:block;width:100%;padding:16px;border-radius:14px;border:none;
-  background:var(--gold);color:#2a1c0c;font-weight:800;font-size:1.15rem;
-  margin:14px 0;letter-spacing:.3px;
+  display:block;width:100%;padding:15px;border-radius:12px;border:none;
+  background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:1.1rem;
+  margin:14px 0;letter-spacing:.2px;box-shadow:var(--shadow);
 }
-.btn.secondary{background:var(--panel2);color:var(--gold);border:1px solid var(--gold-dim);}
+.btn.secondary{background:var(--surface-2);color:var(--accent-text);border:1px solid var(--accent-dim);box-shadow:none;}
 .btn:active{transform:translateY(1px);}
-.linklike{background:none;border:none;color:var(--accent);font-weight:700;text-decoration:underline;padding:0;font-size:inherit;}
+.linklike{background:none;border:none;color:var(--info);font-weight:700;text-decoration:underline;padding:0;font-size:inherit;}
 
 label.field{display:block;margin:14px 0;}
-label.field .name{display:block;font-weight:700;margin-bottom:6px;font-size:1.02rem;}
+label.field .name{display:block;font-weight:700;margin-bottom:6px;font-size:1rem;}
 label.field .hint{display:block;color:var(--muted);font-size:.82rem;font-weight:400;margin-bottom:6px;}
+input,select,textarea{accent-color:var(--accent);}
 input,select{
-  width:100%;padding:14px;font-size:1.1rem;border-radius:12px;
-  background:var(--panel2);color:var(--ink);border:1px solid var(--gold-dim);
+  width:100%;padding:13px;font-size:1.05rem;border-radius:12px;
+  background:var(--surface-2);color:var(--ink);border:1px solid var(--line);
   appearance:none;-webkit-appearance:none;
 }
-select{background-image:linear-gradient(45deg,transparent 50%,var(--gold) 50%),linear-gradient(135deg,var(--gold) 50%,transparent 50%);
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
   background-position:calc(100% - 20px) center,calc(100% - 14px) center;
   background-size:6px 6px,6px 6px;background-repeat:no-repeat;padding-right:40px;}
+input[type="color"]{padding:4px;height:44px;cursor:pointer;}
 .row{display:flex;gap:10px;}
 .row > *{flex:1;}
 
 .seg{display:flex;gap:8px;margin:6px 0;}
 .seg button{
-  flex:1;padding:14px;border-radius:12px;border:1px solid var(--gold-dim);
-  background:var(--panel2);color:var(--ink);font-weight:700;
+  flex:1;padding:13px;border-radius:12px;border:1px solid var(--line);
+  background:var(--surface-2);color:var(--ink);font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
 }
-.seg button.on.heal{background:var(--heal);color:#0c2415;border-color:var(--heal);}
-.seg button.on.harm{background:var(--harm);color:#2a0c12;border-color:var(--harm);}
+.seg button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+.seg button.on.heal{background:var(--heal);color:#08140d;border-color:var(--heal);}
+.seg button.on.harm{background:var(--harm);color:#1c0709;border-color:var(--harm);}
 
 /* ---- Slot picker rows ---- */
 .slotgroup{margin:18px 0;}
-.slotgroup h3{color:var(--gold);font-size:1.1rem;border-bottom:1px solid var(--line);padding-bottom:6px;}
+.slotgroup h3{color:var(--accent-text);font-size:1.05rem;border-bottom:1px solid var(--line);padding-bottom:6px;display:flex;align-items:center;gap:8px;}
 .slotrow{display:flex;align-items:center;gap:10px;margin:10px 0;}
 .slotrow .num{
   width:34px;height:34px;flex:0 0 34px;border-radius:50%;
-  background:var(--panel2);border:1px solid var(--gold-dim);color:var(--gold);
+  background:var(--surface-2);border:1px solid var(--accent-dim);color:var(--accent-text);
   display:flex;align-items:center;justify-content:center;font-weight:800;
 }
+.slotrow .num .icn{width:1.1rem;height:1.1rem;}
 .slotrow select{flex:1;}
 .prep-slot{margin:10px 0;}
 .prep-slot .slotrow{margin:0;}
 .prep-preview{margin:6px 0 0 44px;}
 .prep-preview-inner{
-  background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
   padding:10px 12px;
 }
 .prep-preview .meta{font-size:.85rem;margin:2px 0;}
@@ -173,123 +248,128 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--gold) 50%),l
 
 /* ---- Today cast cards ---- */
 .cast-card{
-  background:var(--panel);border:1px solid var(--line);border-radius:14px;
-  padding:14px;margin:12px 0;border-left:6px solid var(--line);
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:14px;margin:12px 0;border-left:5px solid var(--line);box-shadow:var(--shadow);
 }
-.cast-card.rank0{border-left-color:#b58fd6;}
-.cast-card.rank1{border-left-color:#7fb0d6;}
-.cast-card.rank2{border-left-color:#6f9c8f;}
-.cast-card.rank3{border-left-color:#d6a86f;}
-.cast-card.rank4{border-left-color:#d68f8f;}
-.cast-card.rank5{border-left-color:#b0d67f;}
-.cast-card.rank6{border-left-color:#d6cf6f;}
-.cast-card.rank7{border-left-color:#6fb6d6;}
-.cast-card.rank8{border-left-color:#c98fd6;}
-.cast-card.rank9{border-left-color:#d6a0c0;}
-.cast-card.rank10{border-left-color:var(--gold);}
+.cast-card.rank0{border-left-color:var(--rank0);}
+.cast-card.rank1{border-left-color:var(--rank1);}
+.cast-card.rank2{border-left-color:var(--rank2);}
+.cast-card.rank3{border-left-color:var(--rank3);}
+.cast-card.rank4{border-left-color:var(--rank4);}
+.cast-card.rank5{border-left-color:var(--rank5);}
+.cast-card.rank6{border-left-color:var(--rank6);}
+.cast-card.rank7{border-left-color:var(--rank7);}
+.cast-card.rank8{border-left-color:var(--rank8);}
+.cast-card.rank9{border-left-color:var(--rank9);}
+.cast-card.rank10{border-left-color:var(--rank10);}
 .cast-card.heal{border-left-color:var(--heal);}
 .cast-card.harm{border-left-color:var(--harm);}
-.cast-card.spent{opacity:.4;}
+.cast-card.spent{opacity:.45;}
 .cast-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-.cast-top .nm{font-size:1.2rem;font-weight:700;}
+.cast-top .nm{font-size:1.15rem;font-weight:700;}
 .uses{display:flex;gap:6px;align-items:center;}
-.pip{width:26px;height:26px;border-radius:50%;border:2px solid var(--gold);display:inline-block;}
-.pip.full{background:var(--gold);}
+.pip{width:24px;height:24px;border-radius:50%;border:2px solid var(--accent);display:inline-block;}
+.pip.full{background:var(--accent);}
 .pip.spent{background:transparent;opacity:.35;}
 .castbtn{
-  padding:10px 16px;border-radius:10px;border:none;background:var(--gold);
-  color:#2a1c0c;font-weight:800;font-size:1rem;
+  padding:10px 16px;border-radius:10px;border:none;background:var(--accent);
+  color:var(--accent-ink);font-weight:800;font-size:1rem;
 }
-.castbtn.zero{background:var(--panel2);color:var(--muted);}
+.castbtn.zero{background:var(--surface-2);color:var(--muted);}
 .unlim{font-size:.85rem;color:var(--heal);font-weight:700;}
 .detailsbtn{
-  background:none;border:none;color:var(--accent);font-weight:700;
+  background:none;border:none;color:var(--info);font-weight:700;
   padding:8px 0 0;font-size:.95rem;text-decoration:underline;
 }
 
 .susbtn{
-  padding:10px 14px;border-radius:10px;border:1px solid var(--accent);
-  background:#11305a;color:#cfe5f7;font-weight:800;font-size:.95rem;
+  padding:10px 14px;border-radius:10px;border:1px solid var(--info);
+  background:var(--info-bg);color:var(--info-ink);font-weight:800;font-size:.95rem;
 }
-.susbtn.on{background:var(--accent);color:#0c1d2a;}
+.susbtn.on{background:var(--info);color:var(--surface);}
 .susrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line);}
 .susrow:first-of-type{border-top:none;}
 .susrow span{font-weight:700;}
 
 .dmgline{margin:4px 0 2px;}
 .dmgchip{
-  display:inline-block;background:#2a1d14;border:1px solid var(--gold-dim);
-  color:var(--gold);font-weight:800;font-size:.95rem;border-radius:8px;padding:2px 10px;
+  display:inline-block;background:var(--surface-2);border:1px solid var(--line);
+  color:var(--ink);font-weight:800;font-size:.92rem;border-radius:8px;padding:2px 10px;
 }
+.dmgchip.dmg{background:color-mix(in srgb, var(--harm) 15%, var(--surface));border-color:color-mix(in srgb, var(--harm) 40%, var(--line));color:var(--harm);}
+.dmgchip.heal{background:color-mix(in srgb, var(--heal) 15%, var(--surface));border-color:color-mix(in srgb, var(--heal) 40%, var(--line));color:var(--heal);}
 
 .empty{text-align:center;color:var(--muted);padding:40px 20px;}
 
 .filterbar{display:flex;gap:8px;margin:6px 0 14px;flex-wrap:wrap;}
 .chip{
-  padding:8px 14px;border-radius:20px;border:1px solid var(--gold-dim);
-  background:var(--panel2);color:var(--muted);font-weight:700;font-size:.9rem;
+  padding:8px 14px;border-radius:20px;border:1px solid var(--line);
+  background:var(--surface-2);color:var(--muted);font-weight:700;font-size:.88rem;
+  display:inline-flex;align-items:center;gap:6px;
 }
-.chip.on{background:var(--gold);color:#2a1c0c;border-color:var(--gold);}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
 #search{margin-bottom:8px;}
 #filterToggle{margin:0 0 8px;}
-#browseFilters{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 12px;}
+#browseFilters{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 12px;}
 .fgroup{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0;}
 .fgroup .flabel{font-size:.8rem;color:var(--muted);font-weight:700;min-width:58px;}
 
 .sectionhead{
-  color:var(--gold);font-size:1.15rem;font-weight:800;margin:22px 0 4px;
+  color:var(--accent-text);font-size:1.1rem;font-weight:800;margin:22px 0 4px;
   display:flex;align-items:center;gap:10px;
 }
-.sectionhead .count{font-size:.85rem;color:var(--muted);font-weight:600;}
+.sectionhead .count{font-size:.82rem;color:var(--muted);font-weight:600;}
 .divider{height:1px;background:var(--line);margin:4px 0 6px;}
 
 .banner{
-  background:#2a2412;border:1px solid var(--gold-dim);border-radius:12px;
-  padding:12px 14px;margin:12px 0;color:var(--muted);font-size:.9rem;
+  background:var(--accent-soft);border:1px solid var(--accent-dim);border-radius:12px;
+  padding:12px 14px;margin:12px 0;color:var(--ink);font-size:.9rem;
 }
-.banner b{color:var(--gold);}
+.banner b{color:var(--accent-text);}
 
-details.help{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin:12px 0;padding:0 16px;}
-details.help summary{padding:16px 0;font-weight:700;font-size:1.1rem;color:var(--gold);cursor:pointer;list-style:none;}
+details.help{background:var(--surface);border:1px solid var(--line);border-radius:14px;margin:12px 0;padding:0 16px;}
+details.help summary{padding:16px 0;font-weight:700;font-size:1.05rem;color:var(--accent-text);cursor:pointer;list-style:none;}
 details.help summary::-webkit-details-marker{display:none;}
 details.help summary::after{content:"＋";float:right;color:var(--muted);}
 details.help[open] summary::after{content:"－";}
 details.help .body{padding:0 0 16px;font-size:1rem;line-height:1.6;color:var(--ink);}
-details.help .body b{color:var(--gold);}
+details.help .body b{color:var(--accent-text);}
 
 /* ---- Class picker ---- */
 .classcard{
   display:flex;align-items:center;gap:14px;width:100%;text-align:left;
-  background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--gold);
-  border-radius:var(--radius);padding:16px;margin:12px 0;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);
+  border-radius:var(--radius);padding:16px;margin:12px 0;color:var(--ink);box-shadow:var(--shadow);
 }
 .classcard:active{transform:translateY(1px);}
-.classcard .ic{font-size:2.2rem;line-height:1;}
+.classcard .ic{font-size:2rem;line-height:1;display:inline-flex;color:var(--accent-text);}
 .classcard .txt{flex:1;}
-.classcard .nm{font-size:1.3rem;font-weight:800;color:var(--gold);}
-.classcard .tl{font-size:.9rem;color:var(--muted);margin-top:2px;}
-.classcard .arr{color:var(--gold-dim);font-size:1.4rem;font-weight:800;}
+.classcard .nm{font-size:1.25rem;font-weight:800;color:var(--ink);}
+.classcard .tl{font-size:.88rem;color:var(--muted);margin-top:2px;}
+.classcard .arr{color:var(--muted);font-size:1.3rem;font-weight:800;}
 .previewtag{
   font-size:.62rem;text-transform:uppercase;letter-spacing:.5px;vertical-align:middle;
-  background:#3a1d1d;border:1px solid #8a4b4b;color:#f0c0c0;border-radius:6px;padding:1px 6px;font-weight:700;
+  background:color-mix(in srgb, var(--harm) 15%, var(--surface));
+  border:1px solid color-mix(in srgb, var(--harm) 40%, var(--line));
+  color:var(--harm);border-radius:6px;padding:1px 6px;font-weight:700;
 }
 
 /* ---- Browse compact rows (tap to expand) ---- */
 .browse-row{
-  background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--line);
+  background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);
   border-radius:12px;margin:8px 0;overflow:hidden;
 }
-.browse-row.rank0{border-left-color:#b58fd6;}
-.browse-row.rank1{border-left-color:#7fb0d6;}
-.browse-row.rank2{border-left-color:#6f9c8f;}
-.browse-row.rank3{border-left-color:#d6a86f;}
-.browse-row.rank4{border-left-color:#d68f8f;}
-.browse-row.rank5{border-left-color:#b0d67f;}
-.browse-row.rank6{border-left-color:#d6cf6f;}
-.browse-row.rank7{border-left-color:#6fb6d6;}
-.browse-row.rank8{border-left-color:#c98fd6;}
-.browse-row.rank9{border-left-color:#d6a0c0;}
-.browse-row.rank10{border-left-color:var(--gold);}
+.browse-row.rank0{border-left-color:var(--rank0);}
+.browse-row.rank1{border-left-color:var(--rank1);}
+.browse-row.rank2{border-left-color:var(--rank2);}
+.browse-row.rank3{border-left-color:var(--rank3);}
+.browse-row.rank4{border-left-color:var(--rank4);}
+.browse-row.rank5{border-left-color:var(--rank5);}
+.browse-row.rank6{border-left-color:var(--rank6);}
+.browse-row.rank7{border-left-color:var(--rank7);}
+.browse-row.rank8{border-left-color:var(--rank8);}
+.browse-row.rank9{border-left-color:var(--rank9);}
+.browse-row.rank10{border-left-color:var(--rank10);}
 .browse-row-head{
   display:flex;flex-direction:column;align-items:flex-start;gap:2px;
   width:100%;text-align:left;background:none;border:none;color:var(--ink);
@@ -297,75 +377,83 @@ details.help .body b{color:var(--gold);}
 }
 .browse-row-head::after{content:"▾";position:absolute;right:14px;top:14px;color:var(--muted);}
 .browse-row-head.open::after{content:"▴";}
-.browse-row-head .brn{font-size:1.1rem;font-weight:700;}
+.browse-row-head .brn{font-size:1.05rem;font-weight:700;}
 .browse-row-head .brmeta{font-size:.82rem;color:var(--muted);}
-.brfocus{font-size:.62rem;text-transform:uppercase;letter-spacing:.5px;color:#c0a0e0;border:1px solid #6f5b8a;border-radius:5px;padding:0 5px;vertical-align:middle;}
+.brfocus{font-size:.62rem;text-transform:uppercase;letter-spacing:.5px;color:var(--accent-text);border:1px solid var(--accent-dim);border-radius:5px;padding:0 5px;vertical-align:middle;}
 .formerly{font-size:.72rem;font-style:italic;font-weight:600;color:var(--muted);white-space:nowrap;}
-.ritualtag{font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;font-weight:800;background:#3a1d3a;border:1px solid #8a4b8a;color:#e7c6e7;border-radius:6px;padding:1px 7px;}
+.ritualtag{font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;font-weight:800;background:var(--accent-soft);border:1px solid var(--accent-dim);color:var(--accent-text);border-radius:6px;padding:1px 7px;}
 .browse-card{padding:0 12px 4px;}
 .browse-card .card{margin:0 0 10px;}
 
 /* ---- Header menu button + character menu ---- */
 .tophead{display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .menubtn{
-  flex:0 0 auto;background:var(--panel2);border:1px solid var(--gold-dim);
-  border-radius:12px;width:44px;height:44px;font-size:1.3rem;line-height:1;color:var(--gold);
+  flex:0 0 auto;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:12px;width:44px;height:44px;font-size:1.3rem;line-height:1;color:var(--accent-text);
+  display:inline-flex;align-items:center;justify-content:center;
 }
-.classcard.activechar{border-left-color:var(--gold);background:#332615;}
+.classcard.activechar{border-left-color:var(--accent);background:var(--accent-soft);}
 textarea{
-  width:100%;padding:14px;font-size:1rem;border-radius:12px;line-height:1.4;
-  background:var(--panel2);color:var(--ink);border:1px solid var(--gold-dim);
+  width:100%;padding:13px;font-size:1rem;border-radius:12px;line-height:1.4;
+  background:var(--surface-2);color:var(--ink);border:1px solid var(--line);
   font-family:inherit;resize:vertical;margin:6px 0;
 }
+
+/* ---- Appearance / custom palette ---- */
+.swatchrow{display:flex;align-items:center;gap:10px;margin:8px 0;}
+.swatchrow label{flex:1;font-weight:600;font-size:.95rem;}
+.swatchrow input[type="color"]{flex:0 0 56px;width:56px;}
 
 /* ---- Repertoire builder (spontaneous) ---- */
 .rep-row .slotrow{gap:8px;}
 .sigstar{
   width:38px;height:38px;flex:0 0 38px;border-radius:10px;
-  background:var(--panel2);border:1px solid var(--gold-dim);color:var(--muted);
+  background:var(--surface-2);border:1px solid var(--accent-dim);color:var(--muted);
   font-size:1.2rem;line-height:1;display:flex;align-items:center;justify-content:center;
 }
-.sigstar.on{background:var(--gold);color:#2a1c0c;border-color:var(--gold);}
+.sigstar.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
 .rmrow{
   width:38px;height:38px;flex:0 0 38px;border-radius:10px;
-  background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-weight:700;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--muted);font-weight:700;
 }
-.focus-checklist{max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;margin-top:8px;background:var(--panel2);}
+.focus-checklist{max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;margin-top:8px;background:var(--surface-2);}
 .fcheck{display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid var(--line);cursor:pointer;}
 .fcheck:last-child{border-bottom:none;}
 .fcheck input{width:22px;height:22px;flex:0 0 22px;}
 .fcheck .fcname{flex:1;font-weight:600;}
-.fcheck .fcrank{font-size:.75rem;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 7px;}
+.fcheck .fcrank{font-size:.75rem;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1px 7px;}
 
 .btn.addrow{
   display:inline-block;width:auto;padding:10px 16px;margin:4px 0 0 44px;
-  font-size:.95rem;font-weight:700;border-radius:10px;
-  background:var(--panel2);color:var(--gold);border:1px solid var(--gold-dim);
+  font-size:.95rem;font-weight:700;border-radius:10px;box-shadow:none;
+  background:var(--surface-2);color:var(--accent-text);border:1px solid var(--accent-dim);
 }
 .slottag{
-  font-size:.85rem;background:var(--panel2);border:1px solid var(--gold-dim);
-  border-radius:6px;padding:1px 6px;margin-right:4px;
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:.85rem;background:var(--surface-2);border:1px solid var(--accent-dim);
+  color:var(--accent-text);border-radius:6px;padding:1px 6px;margin-right:4px;
 }
+.slottag .icn{width:.95rem;height:.95rem;}
 
 /* ---- Bottom nav ---- */
 nav.bottom{
   position:fixed;bottom:0;left:0;right:0;z-index:30;
-  background:#241810;border-top:2px solid var(--gold-dim);
+  background:var(--surface);border-top:1px solid var(--line);
   display:flex;justify-content:space-around;
   padding:6px 4px calc(6px + env(safe-area-inset-bottom));
 }
 nav.bottom button{
   flex:1;background:none;border:none;color:var(--muted);
-  display:flex;flex-direction:column;align-items:center;gap:2px;
-  padding:8px 2px;font-size:.72rem;font-weight:700;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:8px 2px;font-size:.7rem;font-weight:700;
 }
-nav.bottom button .ic{font-size:1.5rem;line-height:1;}
-nav.bottom button.on{color:var(--gold);}
+nav.bottom button .ic{font-size:1.4rem;line-height:1;display:inline-flex;}
+nav.bottom button.on{color:var(--accent-text);}
 .toast{
   position:fixed;bottom:96px;left:50%;transform:translateX(-50%);
-  background:var(--gold);color:#2a1c0c;font-weight:800;padding:12px 20px;
+  background:var(--accent);color:var(--accent-ink);font-weight:800;padding:12px 20px;
   border-radius:30px;z-index:50;opacity:0;transition:opacity .25s;pointer-events:none;
-  box-shadow:0 4px 16px rgba(0,0,0,.5);
+  box-shadow:0 4px 16px rgba(0,0,0,.35);
 }
 .toast.show{opacity:1;}
 
@@ -375,8 +463,8 @@ nav.bottom button.on{color:var(--gold);}
 
 <header class="top hide">
   <div class="tophead">
-    <h1><span id="charIcon">📖</span> <span id="charNameHead">Spellbook</span></h1>
-    <button class="menubtn" onclick="openMenu()" title="Characters &amp; backup" aria-label="Characters menu">👤</button>
+    <h1><span id="charIcon"></span> <span id="charNameHead">Spellbook</span></h1>
+    <button class="menubtn" onclick="openMenu()" title="Characters &amp; backup" aria-label="Characters menu"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></button>
   </div>
   <div class="sub" id="charSub">Pathfinder 2e (Remaster)</div>
   <div class="statbar" id="statbar">
@@ -391,11 +479,14 @@ nav.bottom button.on{color:var(--gold);}
 
 <!-- ================= CHARACTER MENU ================= -->
 <section id="view-menu" class="wrap hide">
-  <h2>📲 Use offline</h2>
+  <h2>Appearance</h2>
+  <div id="appearancePanel"></div>
+
+  <h2 style="margin-top:24px">Use offline</h2>
   <p class="meta">Everything you do — your characters and prepared spells — is saved <b>on this device only</b>, in your browser. Nothing is sent anywhere. Keep a copy so it always works, even with no signal:</p>
   <div class="row">
-    <button class="btn" onclick="downloadOffline()">📥 Save offline copy</button>
-    <button class="btn secondary" id="installBtn" style="display:none" onclick="installApp()">⬇ Install app</button>
+    <button class="btn" onclick="downloadOffline()">Save offline copy</button>
+    <button class="btn secondary" id="installBtn" style="display:none" onclick="installApp()">Install app</button>
   </div>
   <p class="meta" id="offlineHint" style="font-size:.8rem">“Save offline copy” downloads this whole spellbook as a single file you can open any time — no internet needed. “Install app” adds it to your home screen like a normal app (appears when your browser supports it).</p>
 
@@ -407,8 +498,8 @@ nav.bottom button.on{color:var(--gold);}
   <h2 style="margin-top:24px">Share &amp; back up</h2>
   <p class="meta">Export your <b>active</b> character to a code you can save or send to a friend. To load one, paste a code below and tap Import — it's added as a new character.</p>
   <div class="row">
-    <button class="btn secondary" onclick="exportCharacter()">⬆ Export active</button>
-    <button class="btn secondary" onclick="importCharacter()">⬇ Import code</button>
+    <button class="btn secondary" onclick="exportCharacter()">Export active</button>
+    <button class="btn secondary" onclick="importCharacter()">Import code</button>
   </div>
   <textarea id="menuIO" rows="3" placeholder="Character code appears here on Export — or paste one here, then tap Import."></textarea>
   <button class="btn secondary" onclick="closeMenu()">← Back</button>
@@ -428,7 +519,7 @@ nav.bottom button.on{color:var(--gold);}
 <!-- ================= PREPARE / REPERTOIRE ================= -->
 <section id="view-prepare" class="wrap hide">
   <p class="meta" id="prepClassLine"></p>
-  <div class="banner hide" id="prepPreviewBanner">ℹ️ Spell slots, cantrips, and focus spells are fully tracked. A few subclass extras (blood magic, oracular curse, companions/familiars) stay on your character sheet — noted below where relevant.</div>
+  <div class="banner hide" id="prepPreviewBanner">Spell slots, cantrips, and focus spells are fully tracked. A few subclass extras (blood magic, oracular curse, companions/familiars) stay on your character sheet — noted below where relevant.</div>
 
   <h2>① Your character</h2>
   <p class="meta">Copy these from your character sheet.</p>
@@ -465,9 +556,9 @@ nav.bottom button.on{color:var(--gold);}
 <!-- ================= BROWSE ================= -->
 <section id="view-browse" class="wrap hide">
   <h2 id="browseTitle">All spells</h2>
-  <input type="text" id="search" placeholder="🔍 Search spells…" oninput="renderBrowse()">
+  <input type="text" id="search" placeholder="Search spells…" oninput="renderBrowse()">
   <div class="filterbar" id="rankChips"></div>
-  <button class="chip" id="filterToggle" onclick="toggleBrowseFilters()" aria-expanded="false">⚙ Filters</button>
+  <button class="chip" id="filterToggle" onclick="toggleBrowseFilters()" aria-expanded="false"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="17" r="2"/></svg> Filters</button>
   <div id="browseFilters" class="hide"></div>
   <div id="browseList"></div>
 </section>
@@ -482,10 +573,10 @@ nav.bottom button.on{color:var(--gold);}
 <div class="toast" id="toast"></div>
 
 <nav class="bottom hide">
-  <button id="nav-today" class="on" onclick="go('today')"><span class="ic">📜</span>Cast Today</button>
-  <button id="nav-prepare" onclick="go('prepare')"><span class="ic">🌅</span>Prepare</button>
-  <button id="nav-browse" onclick="go('browse')"><span class="ic">📖</span>All Spells</button>
-  <button id="nav-help" onclick="go('help')"><span class="ic">❓</span>Help</button>
+  <button id="nav-today" class="on" onclick="go('today')"><span class="ic"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3.5" width="12.5" height="17" rx="2"/><path d="M4.5 7v11.5a2 2 0 0 0 2 2h9.5"/></svg></span>Cast Today</button>
+  <button id="nav-prepare" onclick="go('prepare')"><span class="ic"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18.5h18"/><path d="M6.5 18.5a5.5 5.5 0 0 1 11 0"/><path d="M12 3v3M4.2 8.7l1.7 1.7M19.8 8.7l-1.7 1.7"/></svg></span>Prepare</button>
+  <button id="nav-browse" onclick="go('browse')"><span class="ic"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.2A2 2 0 0 1 6 3.2h5.2v15.6H6a2 2 0 0 0-2 2z"/><path d="M20 5.2a2 2 0 0 0-2-2h-5.2v15.6H18a2 2 0 0 1 2 2z"/></svg></span>All Spells</button>
+  <button id="nav-help" onclick="go('help')"><span class="ic"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.4 9.4a2.6 2.6 0 1 1 3.6 2.4c-.9.5-1.1 1-1.1 1.9"/><path d="M12 16.7v.01"/></svg></span>Help</button>
 </nav>
 
 <script>
@@ -58710,6 +58801,46 @@ function psychicSlots(level){
   return slots;
 }
 
+/* ============================================================
+   INLINE SVG ICON REGISTRY
+   Thin line icons (24x24, stroke = currentColor) so they inherit the
+   active accent colour. Keyed by name; classes/features reference a key
+   instead of an emoji. iconSvg() wraps the path data in an <svg>.
+   ============================================================ */
+const ICONS={
+  /* classes */
+  cleric:'<circle cx="12" cy="12" r="3.4"/><path d="M12 3v2.6M12 18.4V21M3 12h2.6M18.4 12H21M5.6 5.6l1.9 1.9M16.5 16.5l1.9 1.9M18.4 5.6l-1.9 1.9M7.5 16.5l-1.9 1.9"/>',
+  wizard:'<path d="M12 3.5 4.5 19.5h15z"/><circle cx="12" cy="13.5" r="1.9"/>',
+  druid:'<path d="M5 19.5C5 11 10.5 5 19 4.5 19 13 13.5 19 5 19.5z"/><path d="M11.5 12 5 19.5"/>',
+  witch:'<path d="M17.5 15.2A6 6 0 1 1 11.3 5a5 5 0 0 0 6.2 10.2z"/><path d="M18.3 3.6l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>',
+  sorcerer:'<path d="M12 3c2.8 3.6 4.6 5.6 4.6 8.4a4.6 4.6 0 0 1-9.2 0c0-1.2.6-2.2 1.6-3.1.3 1.1 1 1.6 1.6 1.6C9.4 8.4 10.3 5.7 12 3z"/>',
+  bard:'<path d="M9.5 17.5V6.2l9-2v9.6"/><circle cx="6.8" cy="17.5" r="2.4"/><circle cx="15.8" cy="15.8" r="2.4"/>',
+  oracle:'<path d="M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="2.4"/>',
+  magus:'<path d="M17.5 3.5 20.5 6.5 12 15l-3 1 1-3z"/><path d="M8 14l-4 4"/><path d="M5.5 15.5l3 3"/>',
+  summoner:'<circle cx="9.2" cy="12" r="4.8"/><circle cx="14.8" cy="12" r="4.8"/>',
+  psychic:'<path d="M12 12a1.5 1.5 0 1 0 1.6-1.5A3.6 3.6 0 1 0 8.4 12 5.7 5.7 0 1 0 17.7 7.7"/>',
+  animist:'<path d="M12 3c2 2.5 3.1 4 3.1 6a3.1 3.1 0 0 1-6.2 0c0-1 .5-2 1.5-2.9.3.8.8 1.2 1.3 1.2C11 6 11 5 12 3z"/><path d="M12 12v6"/><path d="M9 21h6"/>',
+  /* navigation */
+  today:'<rect x="7" y="3.5" width="12.5" height="17" rx="2"/><path d="M4.5 7v11.5a2 2 0 0 0 2 2h9.5"/>',
+  prepare:'<path d="M3 18.5h18"/><path d="M6.5 18.5a5.5 5.5 0 0 1 11 0"/><path d="M12 3v3M4.2 8.7l1.7 1.7M19.8 8.7l-1.7 1.7"/>',
+  browse:'<path d="M4 5.2A2 2 0 0 1 6 3.2h5.2v15.6H6a2 2 0 0 0-2 2z"/><path d="M20 5.2a2 2 0 0 0-2-2h-5.2v15.6H18a2 2 0 0 1 2 2z"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.4 9.4a2.6 2.6 0 1 1 3.6 2.4c-.9.5-1.1 1-1.1 1.9"/><path d="M12 16.7v.01"/>',
+  /* features / utility */
+  school:'<path d="M2.5 8.5 12 4.5l9.5 4-9.5 4z"/><path d="M6.5 10.5v4c0 1.5 11 1.5 11 0v-4"/><path d="M21.5 8.5v5"/>',
+  bonded:'<path d="M9.3 12.4a3 3 0 0 1 0-4.2l1.9-1.9a3 3 0 0 1 4.2 4.2l-1 1"/><path d="M14.7 11.6a3 3 0 0 1 0 4.2l-1.9 1.9a3 3 0 0 1-4.2-4.2l1-1"/>',
+  heal:'<path d="M12 5.5v13M5.5 12h13"/>',
+  harm:'<path d="M12 3a7 7 0 0 0-7 7c0 2 1 3.6 2.2 4.6V17a1 1 0 0 0 1 1h7.6a1 1 0 0 0 1-1v-2.4C19 13.6 20 12 20 10a7 7 0 0 0-7-7z" transform="translate(-1 0)"/><circle cx="8.5" cy="10.5" r="1.1"/><circle cx="13.5" cy="10.5" r="1.1"/><path d="M9 18v2M11 18v2M13 18v2"/>',
+  menu:'<circle cx="12" cy="8" r="3.4"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/>',
+  filter:'<path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="17" r="2"/>',
+  plus:'<path d="M12 5.5v13M5.5 12h13"/>',
+  book:'<path d="M12 6.5C9.5 4.7 6 4.7 3.5 6v13c2.5-1.3 6-1.3 8.5.5 2.5-1.8 6-1.8 8.5-.5V6c-2.5-1.3-6-1.3-8.5.5z"/><path d="M12 6.5v13"/>',
+};
+function iconSvg(name, cls){
+  return '<svg class="icn '+(cls||"")+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" '+
+    'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+    (ICONS[name]||"")+'</svg>';
+}
+
 /* [minLevel, proficiency bonus] for spell DC / spell attack, highest first.
    Bonus = 2/4/6/8 for trained/expert/master/legendary.
    Wizard, Druid, Sorcerer, Bard, Oracle, Psychic and the Cloistered Cleric
@@ -58757,13 +58888,13 @@ const CORE_HELP=[
   ["Remaster vs. legacy (original) rules",
    "This app uses the current <b>Remaster</b> spell names and rules. If your group still plays the <b>original</b> (pre-Remaster) edition, most spells are identical — and renamed ones show a small <i>“formerly …”</i> note, so you can also <b>search by the old name</b> (e.g. searching <b>Magic Missile</b> finds <b>Force Barrage</b>). A few legacy spells that weren't changed are still listed under their original names too.<br><br>A few wording changes to keep in mind: spell <b>rank</b> = spell <b>level</b>; <b>vitality</b>/<b>void</b> damage = the old <b>positive</b>/<b>negative</b>; and <b>holy</b>/<b>unholy</b> replace the old <b>good</b>/<b>evil</b> alignment damage. The numbers and effects are the same."],
   ["Multiple characters, backup & sharing",
-   "Tap the <b>👤</b> button (top right) to keep <b>several characters</b> and switch between them — each remembers its own prepared spells. From there you can also <b>Export</b> a character to a code to back it up or send to a friend, and <b>Import</b> a code someone shares with you. Everything is stored on your device."],
+   "Tap the <b>character</b> button (top right) to keep <b>several characters</b> and switch between them — each remembers its own prepared spells. From there you can also <b>Export</b> a character to a code to back it up or send to a friend, and <b>Import</b> a code someone shares with you. Everything is stored on your device."],
 ];
 
 const CLASSES={
   /* ---------------- CLERIC ---------------- */
   cleric:{
-    id:"cleric", name:"Cleric", icon:"⛪",
+    id:"cleric", name:"Cleric", icon:"cleric", color:"#d8a23a",
     tagline:"Divine prepared caster · the party's main healer",
     tradition:"divine", keyAbility:"Wisdom", keyAbilityShort:"Wis",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
@@ -58786,30 +58917,30 @@ const CLASSES={
 
   /* ---------------- WIZARD ---------------- */
   wizard:{
-    id:"wizard", name:"Wizard", icon:"🪄",
+    id:"wizard", name:"Wizard", icon:"wizard", color:"#7b6cf0",
     tagline:"Arcane prepared caster · the widest spell list",
     tradition:"arcane", keyAbility:"Intelligence", keyAbilityShort:"Int",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
     preview:true,
     features:[
-      {type:"extraSlots", key:"school", icon:"🎓", label:"Arcane school slot",
+      {type:"extraSlots", key:"school", icon:"school", label:"Arcane school slot",
        note:"One extra slot of each rank you can cast, which must hold a spell from your chosen school / curriculum."},
-      {type:"dailyResource", key:"bonded", icon:"🔗", label:"Drain Bonded Item", uses:1,
+      {type:"dailyResource", key:"bonded", icon:"bonded", label:"Drain Bonded Item", uses:1,
        note:"Once per day, recast a spell you already cast today without spending its slot."},
     ],
     help:[
       ["What does a wizard do?",
        "You're an <b>Arcane</b> prepared caster with the broadest spell list in the game. You Prepare spells each morning from your spellbook, leaning on control and damage like <b>Fireball</b> plus utility."],
       ["Arcane school slot",
-       "Your school (curriculum) gives you <b>one extra prepared slot of every rank</b> you can cast. Fill the 🎓 slots with spells from your school. The app adds these slots automatically."],
+       "Your school (curriculum) gives you <b>one extra prepared slot of every rank</b> you can cast. Fill the <b>school</b> slots with spells from your school. The app adds these slots automatically."],
       ["Drain Bonded Item",
-       "Once per day you can <b>Drain your Bonded Item</b> to recast a spell you've already cast that day, without spending another slot. Tick the 🔗 tracker on Cast Today when you use it."],
+       "Once per day you can <b>Drain your Bonded Item</b> to recast a spell you've already cast that day, without spending another slot. Tick the <b>Drain Bonded Item</b> tracker on Cast Today when you use it."],
     ],
   },
 
   /* ---------------- DRUID ---------------- */
   druid:{
-    id:"druid", name:"Druid", icon:"🌿",
+    id:"druid", name:"Druid", icon:"druid", color:"#4faf6d",
     tagline:"Primal prepared caster · nature's versatility",
     tradition:"primal", keyAbility:"Wisdom", keyAbilityShort:"Wis",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
@@ -58823,7 +58954,7 @@ const CLASSES={
 
   /* ---------------- WITCH ---------------- */
   witch:{
-    id:"witch", name:"Witch", icon:"🔮",
+    id:"witch", name:"Witch", icon:"witch", color:"#b061b8",
     tagline:"Prepared caster · your patron sets the tradition",
     traditionFrom:"patron", defaultTradition:"occult",
     keyAbility:"Intelligence", keyAbilityShort:"Int",
@@ -58838,7 +58969,7 @@ const CLASSES={
 
   /* ---------------- SORCERER ---------------- */
   sorcerer:{
-    id:"sorcerer", name:"Sorcerer", icon:"✨",
+    id:"sorcerer", name:"Sorcerer", icon:"sorcerer", color:"#e05a52",
     tagline:"Spontaneous caster · magic in the blood",
     traditionFrom:"bloodline", keyAbility:"Charisma", keyAbilityShort:"Cha",
     casting:"spontaneous", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
@@ -58857,7 +58988,7 @@ const CLASSES={
 
   /* ---------------- BARD ---------------- */
   bard:{
-    id:"bard", name:"Bard", icon:"🎵",
+    id:"bard", name:"Bard", icon:"bard", color:"#34a8c4",
     tagline:"Occult spontaneous caster · master of support",
     tradition:"occult", keyAbility:"Charisma", keyAbilityShort:"Cha",
     casting:"spontaneous", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
@@ -58876,7 +59007,7 @@ const CLASSES={
 
   /* ---------------- ORACLE ---------------- */
   oracle:{
-    id:"oracle", name:"Oracle", icon:"👁",
+    id:"oracle", name:"Oracle", icon:"oracle", color:"#c061d6",
     tagline:"Divine spontaneous caster · power at a price",
     tradition:"divine", keyAbility:"Charisma", keyAbilityShort:"Cha",
     casting:"spontaneous", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
@@ -58894,7 +59025,7 @@ const CLASSES={
   },
   /* ---------------- MAGUS ---------------- */
   magus:{
-    id:"magus", name:"Magus", icon:"⚔️",
+    id:"magus", name:"Magus", icon:"magus", color:"#5d82e0",
     tagline:"Arcane half-caster · blade and spell as one",
     tradition:"arcane", keyAbility:"Intelligence", keyAbilityShort:"Int",
     casting:"prepared", slots:"partial", prof:PARTIAL_CASTER_PROF, cantrips:5,
@@ -58910,7 +59041,7 @@ const CLASSES={
 
   /* ---------------- SUMMONER ---------------- */
   summoner:{
-    id:"summoner", name:"Summoner", icon:"👹",
+    id:"summoner", name:"Summoner", icon:"summoner", color:"#2bb59a",
     tagline:"Half-caster · you and your eidolon, as one",
     traditionFrom:"patron", defaultTradition:"arcane",
     traditionChoiceLabel:"Eidolon's tradition",
@@ -58932,7 +59063,7 @@ const CLASSES={
 
   /* ---------------- PSYCHIC ---------------- */
   psychic:{
-    id:"psychic", name:"Psychic", icon:"🧠",
+    id:"psychic", name:"Psychic", icon:"psychic", color:"#e05fa6",
     tagline:"Occult spontaneous caster · few spells, mighty cantrips",
     tradition:"occult", keyAbility:"Int or Cha", keyAbilityShort:"Key",
     casting:"spontaneous", slots:"psychic", prof:FULL_CASTER_PROF, cantrips:5,
@@ -58951,7 +59082,7 @@ const CLASSES={
 
   /* ---------------- ANIMIST ---------------- */
   animist:{
-    id:"animist", name:"Animist", icon:"🕯️",
+    id:"animist", name:"Animist", icon:"animist", color:"#e08a3c",
     tagline:"Divine prepared caster · channels apparitions (spirits)",
     tradition:"divine", keyAbility:"Wisdom", keyAbilityShort:"Wis",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:4,
@@ -59050,14 +59181,16 @@ function loadLibrary(){
   }catch(e){}
   try{ // migrate a single v2 character
     const v2=JSON.parse(localStorage.getItem(OLD_KEY));
-    if(v2 && v2.classId){ const c=Object.assign(blankChar(), v2); return {characters:{[c.id]:c}, activeId:c.id}; }
+    if(v2 && v2.classId){ const c=Object.assign(blankChar(), v2); return normalizeLib({characters:{[c.id]:c}, activeId:c.id}); }
   }catch(e){}
   const c=blankChar();
-  return {characters:{[c.id]:c}, activeId:c.id};
+  return normalizeLib({characters:{[c.id]:c}, activeId:c.id});
 }
+function defaultSettings(){ return { themeMode:"auto", custom:null }; }
 function normalizeLib(lib){
   Object.keys(lib.characters).forEach(id=>{ lib.characters[id]=Object.assign(defaultStateFields(), lib.characters[id], {id}); });
   if(!lib.characters[lib.activeId]) lib.activeId=Object.keys(lib.characters)[0];
+  lib.settings=Object.assign(defaultSettings(), lib.settings||{});
   return lib;
 }
 let _storageWarned=false;
@@ -59065,9 +59198,66 @@ function saveState(){
   library.characters[state.id]=state;
   try{ localStorage.setItem(LS_KEY, JSON.stringify(library)); }
   catch(e){
-    if(!_storageWarned && typeof toast==="function"){ toast("⚠ Couldn't save — storage full or disabled"); _storageWarned=true; }
+    if(!_storageWarned && typeof toast==="function"){ toast("Couldn't save — storage full or disabled"); _storageWarned=true; }
   }
 }
+function saveSettings(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(library)); }catch(e){} }
+
+/* ============================================================
+   THEME  (light/dark · per-class accent · custom palette)
+   The base palette flips with [data-theme]; --accent (and its readable
+   ink) is set per active class, or overridden by a custom palette.
+   ============================================================ */
+const DEFAULT_ACCENT="#6c7a89";
+function hexToRgb(h){
+  h=(h||"").replace("#","").trim();
+  if(h.length===3) h=h.split("").map(c=>c+c).join("");
+  const n=parseInt(h||"000000",16);
+  return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
+}
+function relLuminance(hex){
+  const {r,g,b}=hexToRgb(hex);
+  const f=v=>{ v/=255; return v<=.03928 ? v/12.92 : Math.pow((v+.055)/1.055,2.4); };
+  return .2126*f(r)+.7152*f(g)+.0722*f(b);
+}
+function inkFor(hex){ return relLuminance(hex) < .48 ? "#ffffff" : "#15171c"; }
+function mixHex(a,b,t){
+  const A=hexToRgb(a), B=hexToRgb(b);
+  const c=k=>Math.round(A[k]+(B[k]-A[k])*t).toString(16).padStart(2,"0");
+  return "#"+c("r")+c("g")+c("b");
+}
+function resolveThemeMode(){
+  const m=(library.settings&&library.settings.themeMode)||"auto";
+  if(m==="light"||m==="dark") return m;
+  try{ return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light"; }
+  catch(e){ return "dark"; }
+}
+function applyTheme(){
+  const root=document.documentElement;
+  const custom=(library.settings&&library.settings.custom)||null;
+  root.dataset.theme=resolveThemeMode();
+  const accent=(custom&&custom.accent) || (activeClass()&&activeClass().color) || DEFAULT_ACCENT;
+  root.style.setProperty("--accent", accent);
+  root.style.setProperty("--accent-ink", inkFor(accent));
+  // optional full-palette overrides (background / text)
+  if(custom&&custom.bg) root.style.setProperty("--bg", custom.bg); else root.style.removeProperty("--bg");
+  if(custom&&custom.ink) root.style.setProperty("--ink", custom.ink); else root.style.removeProperty("--ink");
+  if(custom&&custom.surface){
+    root.style.setProperty("--surface", custom.surface);
+    root.style.setProperty("--surface-2", mixHex(custom.surface, custom.ink||"#808080", .10));
+  }else{ root.style.removeProperty("--surface"); root.style.removeProperty("--surface-2"); }
+  // keep the browser chrome colour in step with the background
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta){ const bg=getComputedStyle(root).getPropertyValue("--bg").trim(); if(bg) meta.setAttribute("content", bg); }
+}
+function themeColorValue(token){ return (getComputedStyle(document.documentElement).getPropertyValue(token)||"").trim()||"#000000"; }
+function setThemeMode(m){ library.settings.themeMode=m; saveSettings(); applyTheme(); renderMenu(); }
+function setCustomColor(key,val){
+  library.settings.custom=library.settings.custom||{};
+  library.settings.custom[key]=val;
+  saveSettings(); applyTheme();
+}
+function resetTheme(){ library.settings.custom=null; saveSettings(); applyTheme(); renderMenu(); }
 
 /* ============================================================
    CLASS-AWARE HELPERS
@@ -59130,7 +59320,7 @@ function actionLabel(a){
   }
   const m=String(a).match(/^([1-3])\s*(?:to|or|–|-)\s*([1-3])$/);
   if(m) return `${ACTION_GLYPH[m[1]]}–${ACTION_GLYPH[m[2]]} ${m[1]} to ${m[2]} actions`;
-  return "🕑 "+a;
+  return a;
 }
 function titleCaseTrait(t){ return t.charAt(0).toUpperCase()+t.slice(1); }
 function escapeHtml(s){ return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
@@ -59158,12 +59348,11 @@ function scaleDamage(s, castRank){
 }
 function damageChipHTML(s, castRank){
   const ds=scaleDamage(s, castRank); if(!ds) return "";
-  const parts=ds.map(d=>{
-    const icon=d.healing?"✚":"💥";
+  return ds.map(d=>{
+    const cls=d.healing?"heal":"dmg";
     const ty=(d.type&&!d.healing)?" "+escapeHtml(d.type):"";
-    return `${icon} ${escapeHtml(d.formula)}${ty}`;
-  });
-  return `<span class="dmgchip">${parts.join(" &nbsp; ")}</span>`;
+    return `<span class="dmgchip ${cls}">${escapeHtml(d.formula)}${ty}</span>`;
+  }).join(" ");
 }
 
 function spellCardHTML(s, opts){
@@ -59176,7 +59365,7 @@ function spellCardHTML(s, opts){
   if(s.duration) m.push(`<b>Duration</b> ${escapeHtml(s.duration)}`);
   const meta = m.length?`<div class="meta">${m.join(" &nbsp;·&nbsp; ")}</div>`:"";
   const traits=`<div class="traits">${s.traits.map(t=>`<span class="trait">${escapeHtml(titleCaseTrait(t))}</span>`).join("")}</div>`;
-  const saveTag = s.save ? `<span class="save-tag">🛡 ${escapeHtml(s.save)}</span>` : "";
+  const saveTag = s.save ? `<span class="save-tag">${escapeHtml(s.save)}</span>` : "";
   const heighten = s.heightened ? `<div class="heighten"><b>Heightened</b> ${textToHtml(s.heightened)}</div>` : "";
   const note=legacyNote(s)?`<div class="meta" style="margin:-2px 0 4px"><span class="formerly">${escapeHtml(legacyNote(s))}</span></div>`:"";
   return `
@@ -59199,7 +59388,7 @@ function spellCardHTML(s, opts){
 function spellPreviewHTML(s, castRank){
   if(!s) return "";
   const heightNote=(castRank>s.rank)?` · cast at rank ${castRank}`:"";
-  const saveTag=s.save?` · 🛡 ${escapeHtml(s.save)}`:"";
+  const saveTag=s.save?` · ${escapeHtml(s.save)}`:"";
   const m=[];
   if(s.range) m.push(`<b>Range</b> ${escapeHtml(s.range)}`);
   if(s.area)  m.push(`<b>Area</b> ${escapeHtml(s.area)}`);
@@ -59251,7 +59440,7 @@ function toast(msg){
 function charSummary(c){
   if(!c.classId) return "New character — no class yet";
   const cl=CLASSES[c.classId];
-  return `${cl.icon} ${cl.name} · Level ${c.level}`;
+  return `${cl.name} · Level ${c.level}`;
 }
 function openMenu(){
   VIEWS.forEach(v=>document.getElementById("view-"+v).classList.add("hide"));
@@ -59268,17 +59457,32 @@ function renderMenu(){
     const c=library.characters[id];
     const active=id===library.activeId;
     return `<div class="classcard ${active?"activechar":""}">
-      <div class="ic">${c.classId?CLASSES[c.classId].icon:"＋"}</div>
+      <div class="ic" style="color:${c.classId?CLASSES[c.classId].color:"var(--muted)"}">${c.classId?iconSvg(CLASSES[c.classId].icon):iconSvg("plus")}</div>
       <div class="txt" onclick="switchCharacter('${id}')" style="cursor:pointer">
-        <div class="nm">${escapeHtml(c.name||(c.classId?CLASSES[c.classId].name:"Unnamed"))}${active?` <span class="previewtag" style="background:var(--gold);color:#2a1c0c;border-color:var(--gold)">active</span>`:""}</div>
+        <div class="nm">${escapeHtml(c.name||(c.classId?CLASSES[c.classId].name:"Unnamed"))}${active?` <span class="previewtag" style="background:var(--accent);color:var(--accent-ink);border-color:var(--accent)">active</span>`:""}</div>
         <div class="tl">${charSummary(c)}</div>
       </div>
       ${ids.length>1?`<button class="rmrow" title="delete" onclick="deleteCharacter('${id}')">✕</button>`:""}
     </div>`;
   }).join("");
   document.getElementById("menuList").innerHTML=list;
+  renderAppearance();
   showInstallButton(!!deferredInstall);
   const ds=document.getElementById("dataStamp"); if(ds) ds.textContent=dataStampText();
+}
+/* Appearance panel: Light/Dark/Auto + a four-swatch custom palette. */
+function renderAppearance(){
+  const box=document.getElementById("appearancePanel"); if(!box) return;
+  const mode=(library.settings&&library.settings.themeMode)||"auto";
+  const seg=["light","dark","auto"].map(m=>
+    `<button class="${mode===m?"on":""}" onclick="setThemeMode('${m}')">${m[0].toUpperCase()+m.slice(1)}</button>`).join("");
+  const rows=[["Background","bg","--bg"],["Surface","surface","--surface"],["Text","ink","--ink"],["Accent","accent","--accent"]]
+    .map(([label,key,token])=>`<div class="swatchrow"><label>${label}</label>
+      <input type="color" value="${themeColorValue(token)}" oninput="setCustomColor('${key}',this.value)" aria-label="${label} colour"></div>`).join("");
+  box.innerHTML=`<div class="seg" id="themeSeg">${seg}</div>
+    <p class="meta">Colours follow each class's theme by default. Pick your own below — they apply to every character.</p>
+    ${rows}
+    <button class="btn secondary" onclick="resetTheme()">Reset to class default</button>`;
 }
 function newCharacter(){ const c=blankChar(); library.characters[c.id]=c; library.activeId=c.id; state=c; saveState(); showClassPicker(); }
 function switchCharacter(id){
@@ -59305,7 +59509,7 @@ function exportCharacter(){
   const code="PF2E1:"+b64encode(JSON.stringify(c));
   const io=document.getElementById("menuIO");
   io.value=code; io.focus(); io.select();
-  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(code).then(()=>toast("📋 Copied to clipboard")).catch(()=>toast("Code ready — copy it")); }
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(code).then(()=>toast("Copied to clipboard")).catch(()=>toast("Code ready — copy it")); }
   else toast("Code ready — copy it");
 }
 function importCharacter(){
@@ -59317,7 +59521,7 @@ function importCharacter(){
     if(typeof obj!=="object"||!("level" in obj)) throw new Error("bad");
     const c=Object.assign(blankChar(), obj, {id:uid()});
     library.characters[c.id]=c; library.activeId=c.id; state=c; saveState();
-    toast("📥 Character imported");
+    toast("Character imported");
     if(!state.classId){ showClassPicker(); } else { renderHeader(); go(state.prepared?"today":"prepare"); }
   }catch(e){ alert("That code didn't work — make sure you pasted the whole thing."); }
 }
@@ -59332,18 +59536,19 @@ function showClassPicker(){
   const sec=document.getElementById("view-classpick");
   sec.classList.remove("hide");
   sec.innerHTML=`
-    <h1 style="text-align:center">📖 PF2e Spellbook</h1>
+    <h1 style="text-align:center">PF2e Spellbook</h1>
     <p class="meta" style="text-align:center;margin-bottom:18px">Choose your class to begin.</p>
     ${CLASS_ORDER.map(id=>{
       const c=CLASSES[id];
-      return `<button class="classcard" onclick="chooseClass('${id}')">
-        <div class="ic">${c.icon}</div>
+      return `<button class="classcard" style="border-left-color:${c.color}" onclick="chooseClass('${id}')">
+        <div class="ic" style="color:${c.color}">${iconSvg(c.icon)}</div>
         <div class="txt"><div class="nm">${c.name}${c.preview?` <span class="previewtag">preview</span>`:""}</div>
         <div class="tl">${c.tagline}</div></div>
         <div class="arr">→</div>
       </button>`;
     }).join("")}
     <p class="meta" style="text-align:center;margin-top:18px;font-size:.8rem">Pathfinder 2e (Remaster) · unofficial fan tool<br>${escapeHtml(dataStampText())}</p>`;
+  applyTheme();
   window.scrollTo(0,0);
 }
 function chooseClass(id){
@@ -59354,8 +59559,9 @@ function chooseClass(id){
   if(!hasFeature("divineFont")) state.font="heal";
   if(c.traditionFrom==="patron" && !state.patronTradition) state.patronTradition=c.defaultTradition||"occult";
   saveState();
+  applyTheme();
   renderHeader();
-  toast(`${c.icon} ${c.name} selected`);
+  toast(`${c.name} selected`);
   go(state.prepared ? "today" : "prepare");
 }
 function openClassPicker(){ showClassPicker(); }
@@ -59365,7 +59571,8 @@ function openClassPicker(){ showClassPicker(); }
    ============================================================ */
 function renderHeader(){
   const c=activeClass(); if(!c) return;
-  document.getElementById("charIcon").textContent=c.icon;
+  applyTheme();
+  document.getElementById("charIcon").innerHTML=iconSvg(c.icon);
   document.getElementById("charNameHead").textContent=state.name||c.name;
   document.getElementById("charSub").textContent=
     `${c.name} · Pathfinder 2e (Remaster) · ${TRADITION_LABEL[activeTradition()]} list`;
@@ -59431,8 +59638,8 @@ function renderCharExtra(){
       <label class="field"><span class="name">Divine Font</span>
       <span class="hint">Which one did you choose at level 1?</span></label>
       <div class="seg" id="fontSeg">
-        <button data-font="heal" class="heal ${state.font==="heal"?"on":""}" onclick="setFont('heal')">✚ Healing Font</button>
-        <button data-font="harm" class="harm ${state.font==="harm"?"on":""}" onclick="setFont('harm')">☠ Harmful Font</button>
+        <button data-font="heal" class="heal ${state.font==="heal"?"on":""}" onclick="setFont('heal')">${iconSvg("heal")} Healing Font</button>
+        <button data-font="harm" class="harm ${state.font==="harm"?"on":""}" onclick="setFont('harm')">${iconSvg("harm")} Harmful Font</button>
       </div>`;
   }
   if(c.traditionFrom==="bloodline"){
@@ -59463,22 +59670,22 @@ function renderPrepSummary(){
   let extra="";
   if(hasFeature("divineFont")){
     const fontName=state.font==="heal"?"Heal":"Harm";
-    extra+=`<div style="margin-top:4px">${state.font==="heal"?"✚":"☠"} Divine Font: <b>${fontCount()}× ${fontName}</b> (free, heightened to rank ${hr})</div>`;
+    extra+=`<div style="margin-top:4px">${iconSvg(state.font==="heal"?"heal":"harm")} Divine Font: <b>${fontCount()}× ${fontName}</b> (free, heightened to rank ${hr})</div>`;
   }
   getFeatures("extraSlots").forEach(f=>{
-    extra+=`<div style="margin-top:4px">${f.icon} ${f.label}: <b>+1</b> per rank</div>`;
+    extra+=`<div style="margin-top:4px">${iconSvg(f.icon)} ${f.label}: <b>+1</b> per rank</div>`;
   });
   getFeatures("dailyResource").forEach(f=>{
-    extra+=`<div style="margin-top:4px">${f.icon} ${f.label}: <b>${f.uses}×</b>/day</div>`;
+    extra+=`<div style="margin-top:4px">${iconSvg(f.icon)} ${f.label}: <b>${f.uses}×</b>/day</div>`;
   });
   if(hasFocus()){
-    extra+=`<div style="margin-top:4px">🔵 Focus pool: <b>${state.focusPool||1}</b> Focus Point${(state.focusPool||1)>1?"s":""} (focus spells heighten to rank ${focusRank()})</div>`;
+    extra+=`<div style="margin-top:4px">Focus pool: <b>${state.focusPool||1}</b> Focus Point${(state.focusPool||1)>1?"s":""} (focus spells heighten to rank ${focusRank()})</div>`;
   }
   document.getElementById("prepSummary").innerHTML=`
     <div class="meta" style="font-size:1rem">
-      <div>🎯 <b>Spell DC ${spellDC()}</b> &nbsp;·&nbsp; Spell attack ${spellAtk()}</div>
-      <div style="margin-top:8px">🪄 Cantrips ${isSpontaneous()?"known":""}: <b>${c.cantrips}</b></div>
-      <div style="margin-top:4px">📜 ${isSpontaneous()?"Slots (cast any known spell of that rank)":"Spell slots"}: ${slotText||"—"}</div>
+      <div><b>Spell DC ${spellDC()}</b> &nbsp;·&nbsp; Spell attack ${spellAtk()}</div>
+      <div style="margin-top:8px">Cantrips ${isSpontaneous()?"known":""}: <b>${c.cantrips}</b></div>
+      <div style="margin-top:4px">${isSpontaneous()?"Slots (cast any known spell of that rank)":"Spell slots"}: ${slotText||"—"}</div>
       ${extra}
     </div>`;
 }
@@ -59522,14 +59729,14 @@ function focusPicksHTML(){
       <span class="fcname">${escapeHtml(s.name)}</span><span class="fcrank">${rank}</span></label>`;
   }).join("");
   return `<div class="slotgroup">
-    <h3>🔵 Focus spells <span class="count" style="font-weight:600;color:var(--muted)">(pool of ${pool})</span></h3>
+    <h3>Focus spells <span class="count" style="font-weight:600;color:var(--muted)">(pool of ${pool})</span></h3>
     <p class="meta">Focus spells cost <b>Focus Points</b> (shared pool, max 3) and auto-heighten to rank ${focusRank()}. <b>Refocus</b> restores points. Check the ones you know — type below to filter to your domain / bloodline / order.</p>
     <label class="field" style="margin:8px 0"><span class="name">Focus Point pool</span>
       <span class="hint">1 + 1 per extra focus feat, up to 3</span>
       <select id="inFocusPool" onchange="setFocusPool(this.value)">
         ${[1,2,3].map(n=>`<option value="${n}" ${n===pool?"selected":""}>${n} Focus Point${n>1?"s":""}</option>`).join("")}
       </select></label>
-    <input type="text" id="focusFilter" placeholder="🔍 filter focus spells (name or trait)…" oninput="filterFocusChecklist(this.value)" aria-label="filter focus spells">
+    <input type="text" id="focusFilter" placeholder="Filter focus spells (name or trait)…" oninput="filterFocusChecklist(this.value)" aria-label="filter focus spells">
     <div class="focus-checklist" id="focusChecklist">${rows}</div>
   </div>`;
 }
@@ -59547,7 +59754,7 @@ function gatherFocus(){
 function cantripPicksHTML(){
   const c=activeClass();
   const prev=(state.prepared&&state.prepared.cantrips)||[];
-  let html=`<div class="slotgroup"><h3>🪄 Cantrips (pick ${c.cantrips})</h3>`;
+  let html=`<div class="slotgroup"><h3>Cantrips (pick ${c.cantrips})</h3>`;
   for(let i=0;i<c.cantrips;i++){
     const sel=prev[i]||"", pid="cprev"+i;
     html+=`<div class="prep-slot">
@@ -59570,10 +59777,10 @@ function preparedSlotsHTML(){
     const fontName=state.font==="heal"?"Heal":"Harm";
     const fontSpell=findSpell(state.font==="heal"?feat.healSlug:feat.harmSlug);
     html+=`<div class="slotgroup">
-      <h3>${state.font==="heal"?"✚":"☠"} Divine Font — ${fontName} (free slots)</h3>
+      <h3>${iconSvg(state.font==="heal"?"heal":"harm")} Divine Font — ${fontName} (free slots)</h3>
       <p class="meta">These ${fontCount()} castings are free and separate from your normal slots, usable only for <b>${fontName}</b>, auto-heightened to rank ${hr}.</p>`;
     for(let i=0;i<fontCount();i++){
-      html+=`<div class="slotrow"><div class="num">${state.font==="heal"?"✚":"☠"}</div>
+      html+=`<div class="slotrow"><div class="num">${iconSvg(state.font==="heal"?"heal":"harm")}</div>
         <select disabled><option>${fontName} (rank ${hr})</option></select></div>`;
     }
     html+=`<div class="prep-preview">${spellPreviewHTML(fontSpell, hr)}</div></div>`;
@@ -59583,7 +59790,7 @@ function preparedSlotsHTML(){
   Object.keys(slots).map(Number).sort((a,b)=>b-a).forEach(r=>{
     const n=slots[r];
     const prev=prevSlots[r]||[];
-    html+=`<div class="slotgroup"><h3>📜 Rank ${r} slots (${n})</h3>`;
+    html+=`<div class="slotgroup"><h3>Rank ${r} slots (${n})</h3>`;
     for(let i=0;i<n;i++){
       const sel=prev[i]||"", pid="sprev"+r+"_"+i;
       html+=`<div class="prep-slot">
@@ -59596,7 +59803,7 @@ function preparedSlotsHTML(){
       const ex=(prevExtra[f.key]&&prevExtra[f.key][r]&&prevExtra[f.key][r][0])||"";
       const pid="xprev"+f.key+r;
       html+=`<div class="prep-slot">
-        <div class="slotrow"><div class="num">${f.icon}</div>
+        <div class="slotrow"><div class="num">${iconSvg(f.icon)}</div>
         <select class="extraSel" data-key="${f.key}" data-rank="${r}" data-castrank="${r}" data-preview="${pid}" onchange="updatePreview(this)">${spellOptions(r, ex, false)}</select></div>
         <div class="prep-preview" id="${pid}">${spellPreviewHTML(findSpell(ex),r)}</div></div>`;
     });
@@ -59628,7 +59835,7 @@ function repertoireHTML(){
     const count=Math.max(known.length, slots[r]||0);
     if(!count) continue;   // no slots of this rank (e.g. a summoner's shed low ranks) → no repertoire of that rank
     html+=`<div class="slotgroup" data-reprank="${r}">
-      <h3>📜 Rank ${r} spells known <span class="count" style="font-weight:600;color:var(--muted)">(${slots[r]||0} slot${(slots[r]||0)===1?"":"s"}/day)</span></h3>
+      <h3>Rank ${r} spells known <span class="count" style="font-weight:600;color:var(--muted)">(${slots[r]||0} slot${(slots[r]||0)===1?"":"s"}/day)</span></h3>
       <div class="repRows" id="repRows-${r}">`;
     for(let i=0;i<count;i++){
       const e=known[i]||{};
@@ -59678,7 +59885,7 @@ function savePrep(){
   }
   if(focus) state.prepared.focus=focus;
   saveState();
-  toast("✨ Prepared for the day!");
+  toast("Prepared for the day!");
   go("today");
 }
 
@@ -59691,7 +59898,7 @@ function todayHeaderHTML(){
   return `<div class="card" style="text-align:center">
     <div style="font-size:1.1rem"><b>${escapeHtml(state.name||c.name)}</b> · ${c.name} · Level ${state.level}</div>
     <div class="meta" style="font-size:1rem;margin-top:6px">Spell DC <b>${spellDC()}</b> &nbsp;·&nbsp; Spell attack <b>${spellAtk()}</b></div>
-    <button class="btn secondary" style="margin-top:12px" onclick="newDay()">🌅 Rest &amp; reset the day</button>
+    <button class="btn secondary" style="margin-top:12px" onclick="newDay()">Rest &amp; reset the day</button>
   </div>`;
 }
 function dailyResourceHTML(){
@@ -59703,7 +59910,7 @@ function dailyResourceHTML(){
     const btn=done?`<button class="castbtn zero" onclick="uncast('${key}')">↩ undo</button>`
                   :`<button class="castbtn" onclick="doCast('${key}',${f.uses})">Use</button>`;
     html+=`<div class="cast-card ${done?"spent":""}">
-      <div class="cast-top"><div class="nm">${f.icon} ${f.label}</div><div class="uses">${pips} ${btn}</div></div>
+      <div class="cast-top"><div class="nm">${iconSvg(f.icon)} ${f.label}</div><div class="uses">${pips} ${btn}</div></div>
       <div class="meta">${escapeHtml(f.note||"")}</div></div>`;
   });
   return html;
@@ -59729,7 +59936,7 @@ function focusSectionHTML(p){
   const fr=focusRank();
   let pips=""; for(let k=0;k<pool;k++){ pips+=`<span class="pip ${k<remaining?"full":"spent"}"></span>`; }
   const refocus=`<button class="castbtn ${spent>0?"":"zero"}" ${spent>0?"":"disabled"} style="margin-left:8px" onclick="refocus()">↻ Refocus</button>`;
-  let html=`<div class="sectionhead">🔵 Focus spells <span class="count">${remaining}/${pool} point${pool>1?"s":""}</span></div>
+  let html=`<div class="sectionhead">Focus spells <span class="count">${remaining}/${pool} point${pool>1?"s":""}</span></div>
     <div style="margin:2px 0 8px"><span class="uses">${pips}${refocus}</span></div><div class="divider"></div>`;
   f.spells.forEach((slug,i)=>{
     const s=findSpell(slug); if(!s) return;
@@ -59741,16 +59948,16 @@ function focusSectionHTML(p){
               : (out ? `<button class="castbtn zero" disabled>No points</button>`
                      : `<button class="castbtn" onclick="castFocus(${pool})">Cast</button>`);
     const detailsId="f_"+i;
-    html+=`<div class="cast-card ${out?"spent":""}" style="border-left-color:#9b7fd6">
-      <div class="cast-top"><div class="nm">🔵 ${escapeHtml(s.name)} ${heightNote}</div><div class="uses">${btn}</div></div>
-      <div class="meta">${actionLabel(s.actions)}${s.save?` · 🛡 ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
+    html+=`<div class="cast-card ${out?"spent":""}" style="border-left-color:var(--accent)">
+      <div class="cast-top"><div class="nm">${escapeHtml(s.name)} ${heightNote}</div><div class="uses">${btn}</div></div>
+      <div class="meta">${actionLabel(s.actions)}${s.save?` · ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
       <button class="detailsbtn" onclick="toggleDetails('${detailsId}',this)">Show details ▾</button>
       <div id="${detailsId}" class="hide" style="margin-top:10px">${spellCardHTML(s)}</div></div>`;
   });
   return html;
 }
 function castFocus(pool){ const key="focuspool"; state.cast[key]=Math.min(pool,(state.cast[key]||0)+1); saveState(); renderToday(); }
-function refocus(){ state.cast["focuspool"]=0; saveState(); renderToday(); toast("🔵 Refocused"); }
+function refocus(){ state.cast["focuspool"]=0; saveState(); renderToday(); toast("Refocused"); }
 
 function renderTodayPrepared(p){
   let html=todayHeaderHTML();
@@ -59758,12 +59965,12 @@ function renderTodayPrepared(p){
 
   if(p.divineFont){
     const f=p.divineFont; const fontSpell=findSpell(f.fontSlug);
-    html+=`<div class="sectionhead">${f.font==="heal"?"✚":"☠"} Divine Font — ${f.fontName} <span class="count">free</span></div><div class="divider"></div>`;
+    html+=`<div class="sectionhead">${iconSvg(f.font==="heal"?"heal":"harm")} Divine Font — ${f.fontName} <span class="count">free</span></div><div class="divider"></div>`;
     html+=castableCard(fontSpell,"font",f.fontRank,f.fontCount,f.fontRank,0,{cls:f.font});
   }
 
   if(p.cantrips && p.cantrips.length){
-    html+=`<div class="sectionhead">🪄 Cantrips <span class="count">unlimited</span></div><div class="divider"></div>`;
+    html+=`<div class="sectionhead">Cantrips <span class="count">unlimited</span></div><div class="divider"></div>`;
     p.cantrips.forEach((slug,i)=>{ const s=findSpell(slug); if(!s) return; html+=castableCard(s,"cantrip",0,Infinity,0,i); });
   }
 
@@ -59773,7 +59980,7 @@ function renderTodayPrepared(p){
     const extras=[];
     extraFeats.forEach(f=>{ const v=p.extra&&p.extra[f.key]&&p.extra[f.key][r]&&p.extra[f.key][r][0]; if(v) extras.push({f,slug:v}); });
     if(!arr.length && !extras.length) return;
-    html+=`<div class="sectionhead">📜 Rank ${r} spells <span class="count">${arr.length+extras.length} slot${(arr.length+extras.length)>1?"s":""}</span></div><div class="divider"></div>`;
+    html+=`<div class="sectionhead">Rank ${r} spells <span class="count">${arr.length+extras.length} slot${(arr.length+extras.length)>1?"s":""}</span></div><div class="divider"></div>`;
     (p.slots[r]||[]).forEach((slug,i)=>{ if(!slug) return; const s=findSpell(slug); if(!s) return; html+=castableCard(s,"slot",r,1,r,i); });
     extras.forEach(({f,slug})=>{ const s=findSpell(slug); if(!s) return; html+=castableCard(s,"extra_"+f.key,r,1,r,0,{label:f.icon}); });
   });
@@ -59785,7 +59992,7 @@ function renderTodaySpontaneous(p){
   html+=dailyResourceHTML();
 
   if(p.cantrips && p.cantrips.length){
-    html+=`<div class="sectionhead">🪄 Cantrips <span class="count">unlimited</span></div><div class="divider"></div>`;
+    html+=`<div class="sectionhead">Cantrips <span class="count">unlimited</span></div><div class="divider"></div>`;
     p.cantrips.forEach((slug,i)=>{ const s=findSpell(slug); if(!s) return; html+=castableCard(s,"cantrip",0,Infinity,0,i); });
   }
 
@@ -59802,7 +60009,7 @@ function renderTodaySpontaneous(p){
 
     let pips=""; for(let k=0;k<max;k++){ pips+=`<span class="pip ${k<remaining?"full":"spent"}"></span>`; }
     const undo = spent>0 ? `<button class="castbtn zero" style="margin-left:8px" onclick="uncastPool(${R})">↩</button>` : "";
-    html+=`<div class="sectionhead">📜 Rank ${R} <span class="count">${remaining}/${max} slot${max>1?"s":""} left</span></div>
+    html+=`<div class="sectionhead">Rank ${R} <span class="count">${remaining}/${max} slot${max>1?"s":""} left</span></div>
       <div style="margin:2px 0 8px"><span class="uses">${pips}${undo}</span></div><div class="divider"></div>`;
 
     known.forEach((e,i)=>{ const s=findSpell(e.slug); if(!s) return; html+=poolSpellCard(s,R,R,remaining,max,"k"+i,e.sig); });
@@ -59822,7 +60029,7 @@ function castableCard(s, kind, rank, uses, castRank, idx, opts){
   const isSpent=!unlimited && remaining<=0;
   const cls = opts.cls || (isSpent?"":cardClass(s));
   const heightNote=(castRank>s.rank)?`<span class="meta"> · cast at rank ${castRank}</span>`:"";
-  const tag = opts.label?`<span class="slottag">${opts.label}</span> `:"";
+  const tag = opts.label?`<span class="slottag">${iconSvg(opts.label)}</span> `:"";
 
   let usesHtml="";
   if(unlimited){ usesHtml=`<span class="unlim">∞ at will</span>`; }
@@ -59841,7 +60048,7 @@ function castableCard(s, kind, rank, uses, castRank, idx, opts){
       <div class="nm">${tag}${escapeHtml(s.name)} ${heightNote}</div>
       <div class="uses">${usesHtml} ${btn} ${sustainBtn(s)}</div>
     </div>
-    <div class="meta">${actionLabel(s.actions)}${s.save?` · 🛡 ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
+    <div class="meta">${actionLabel(s.actions)}${s.save?` · ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
     <button class="detailsbtn" onclick="toggleDetails('${detailsId}',this)">Show details ▾</button>
     <div id="${detailsId}" class="hide" style="margin-top:10px">${spellCardHTML(s,{cls})}</div>
   </div>`;
@@ -59862,7 +60069,7 @@ function poolSpellCard(s, poolRank, castRank, remaining, max, uid, sig){
       <div class="nm">${star}${escapeHtml(s.name)} ${heightNote}</div>
       <div class="uses">${btn} ${sustainBtn(s)}</div>
     </div>
-    <div class="meta">${actionLabel(s.actions)}${s.save?` · 🛡 ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
+    <div class="meta">${actionLabel(s.actions)}${s.save?` · ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
     <button class="detailsbtn" onclick="toggleDetails('${detailsId}',this)">Show details ▾</button>
     <div id="${detailsId}" class="hide" style="margin-top:10px">${spellCardHTML(s)}</div>
   </div>`;
@@ -59873,22 +60080,22 @@ function doCast(key,max){ state.cast[key]=(state.cast[key]||0)+1; if(state.cast[
 function uncast(key){ state.cast[key]=Math.max(0,(state.cast[key]||0)-1); saveState(); renderToday(); }
 function castPool(rank,max){ const key="pool:"+rank; state.cast[key]=Math.min(max,(state.cast[key]||0)+1); saveState(); renderToday(); }
 function uncastPool(rank){ const key="pool:"+rank; state.cast[key]=Math.max(0,(state.cast[key]||0)-1); saveState(); renderToday(); }
-function newDay(){ if(confirm("Reset all spent slots for a new day? Your prepared list stays the same.")){ state.cast={}; state.sustaining=[]; saveState(); renderToday(); toast("🌅 A new day dawns!"); } }
+function newDay(){ if(confirm("Reset all spent slots for a new day? Your prepared list stays the same.")){ state.cast={}; state.sustaining=[]; saveState(); renderToday(); toast("A new day dawns!"); } }
 
 /* ---- Sustained-spell tracker ---- */
 function sustainBtn(s){
   if(!s || !s.sustained) return "";
   const on=(state.sustaining||[]).includes(s.slug);
-  return on ? `<button class="susbtn on" onclick="endSustain('${s.slug}')">⏳ End</button>`
-            : `<button class="susbtn" onclick="startSustain('${s.slug}')">⏳ Sustain</button>`;
+  return on ? `<button class="susbtn on" onclick="endSustain('${s.slug}')">End</button>`
+            : `<button class="susbtn" onclick="startSustain('${s.slug}')">Sustain</button>`;
 }
-function startSustain(slug){ state.sustaining=state.sustaining||[]; if(!state.sustaining.includes(slug)){ state.sustaining.push(slug); saveState(); renderToday(); toast("⏳ Now sustaining"); } }
+function startSustain(slug){ state.sustaining=state.sustaining||[]; if(!state.sustaining.includes(slug)){ state.sustaining.push(slug); saveState(); renderToday(); toast("Now sustaining"); } }
 function endSustain(slug){ state.sustaining=(state.sustaining||[]).filter(x=>x!==slug); saveState(); renderToday(); }
 function sustainingBarHTML(){
   const list=(state.sustaining||[]).filter(slug=>findSpell(slug));
   if(!list.length) return "";
-  return `<div class="card" style="border-left:6px solid var(--accent)">
-    <div class="sectionhead" style="margin:0 0 6px">⏳ Sustaining now <span class="count">spend an action each turn</span></div>
+  return `<div class="card" style="border-left:5px solid var(--info)">
+    <div class="sectionhead" style="margin:0 0 6px">Sustaining now <span class="count">spend an action each turn</span></div>
     ${list.map(slug=>{const s=findSpell(slug); return `<div class="susrow"><span>${escapeHtml(s.name)}</span><button class="castbtn zero" onclick="endSustain('${slug}')">✓ End</button></div>`;}).join("")}
   </div>`;
 }
@@ -59931,8 +60138,8 @@ function renderBrowseFilters(){
 function renderRankChips(){
   const ranks=[["all","All"],["0","Cantrips"]];
   for(let r=1;r<=10;r++) ranks.push([String(r),"Rank "+r]);
-  if(hasFocus()) ranks.push(["focus","🔵 Focus"]);
-  ranks.push(["rituals","📜 Rituals"]);
+  if(hasFocus()) ranks.push(["focus","Focus"]);
+  ranks.push(["rituals","Rituals"]);
   document.getElementById("rankChips").innerHTML=
     ranks.map(([v,l])=>`<button class="chip ${browseRank===v?"on":""}" onclick="setBrowseRank('${v}')">${l}</button>`).join("");
 }
@@ -59967,7 +60174,7 @@ function renderBrowse(){
 }
 /* Lightweight collapsed row; the full card renders on demand when tapped. */
 function browseRowHTML(s){
-  const save=s.save?` · 🛡 ${escapeHtml(s.save)}`:"";
+  const save=s.save?` · ${escapeHtml(s.save)}`:"";
   const note=legacyNote(s)?` <span class="formerly">${escapeHtml(legacyNote(s))}</span>`:"";
   return `<div class="browse-row rank${s.rank}">
     <button class="browse-row-head" onclick="toggleBrowse('${s.slug}',this)">
@@ -60078,6 +60285,14 @@ function downloadOffline(){
 
 function init(){
   setupInstall();
+  applyTheme();
+  try{
+    if(window.matchMedia){
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{
+        if(((library.settings&&library.settings.themeMode)||"auto")==="auto") applyTheme();
+      });
+    }
+  }catch(e){}
   if(!state.classId){ showClassPicker(); }
   else { renderHeader(); go(state.prepared?"today":"prepare"); }
 }

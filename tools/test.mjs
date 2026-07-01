@@ -359,7 +359,7 @@ ok(w.actionLabel("2") === "◆◆ 2 actions", "single action glyph");
 ok(w.actionLabel("1 to 3").startsWith("◆–◆◆◆"), "1-to-3 action range glyph");
 ok(w.actionLabel("1 or 2").startsWith("◆–◆◆"), "'1 or 2' renders as a glyph range");
 ok(w.actionLabel("reaction") === "⤳ Reaction", "reaction glyph");
-ok(w.actionLabel("10 minutes") === "🕑 10 minutes", "long casts show a clock");
+ok(w.actionLabel("10 minutes") === "10 minutes", "long casts show the plain time");
 
 console.log("\n# in-app data integrity guard");
 ok(ev("new Set(SPELLS.map(s=>s.slug)).size === SPELLS.length"), "all spell slugs unique (no findSpell collisions)");
@@ -388,7 +388,7 @@ w.chooseClass("cleric"); ev("state.level=3"); w.go("prepare");
 [...d.querySelectorAll(".slotSel")].forEach(sel=>{ if(sel.dataset.rank==="2"){ sel.value="heal"; } else { const o=[...sel.options].find(o=>o.value); if(o) sel.value=o.value; } });
 [...d.querySelectorAll(".cantripSel")].forEach(s=>{ const o=[...s.options].find(o=>o.value); if(o) s.value=o.value; });
 w.savePrep();
-ok(/✚ 2d8/.test(d.getElementById("todayContent").innerHTML), "Heal slotted at rank 2 shows ✚ 2d8 on Cast Today");
+ok(/dmgchip heal[^>]*>\s*2d8/.test(d.getElementById("todayContent").innerHTML), "Heal slotted at rank 2 shows a 2d8 healing chip on Cast Today");
 
 
 console.log("\n# SUSTAINED TRACKER (#2)");
@@ -399,7 +399,7 @@ w.go("prepare");
 [...d.querySelectorAll(".slotSel")].forEach(sel=>{ const r=+sel.dataset.rank; if(r===sus.rank){ sel.value=sus.slug; } else { const o=[...sel.options].find(o=>o.value); if(o) sel.value=o.value; } });
 [...d.querySelectorAll(".cantripSel")].forEach(x=>{ const o=[...x.options].find(o=>o.value); if(o) x.value=o.value; });
 w.savePrep();
-ok(/⏳ Sustain/.test(d.getElementById("todayContent").innerHTML), "sustained spell shows a Sustain button on Cast Today");
+ok(/susbtn[^>]*>Sustain</.test(d.getElementById("todayContent").innerHTML), "sustained spell shows a Sustain button on Cast Today");
 w.startSustain(sus.slug);
 ok((ev("state.sustaining")||[]).includes(sus.slug), "startSustain adds the spell to the tracker");
 ok(/Sustaining now/.test(d.getElementById("todayContent").innerHTML), "Sustaining-now bar appears");
@@ -480,7 +480,7 @@ ok([...d.querySelectorAll("#focusChecklist .fcheck")].every(el=>!el.classList.co
 
 console.log("\n# RITUALS BROWSER + INSTALL (#10)");
 w.chooseClass("wizard"); w.go("browse");
-ok(/📜 Rituals/.test(d.getElementById("rankChips").innerHTML), "Rituals chip present in Browse");
+ok(/Rituals/.test(d.getElementById("rankChips").innerHTML), "Rituals chip present in Browse");
 w.setBrowseRank("rituals");
 d.getElementById("search").value=""; w.setBrowseSave("all"); w.setBrowseAction("all"); w.setBrowseTrait(""); w.renderBrowse();
 ok(d.getElementById("browseTitle").textContent.includes("Ritual"), "browse titled Rituals");
@@ -531,6 +531,39 @@ ok(/on this device only/i.test(d.getElementById("view-menu").innerHTML), "menu r
   w.alert = realAlert;
   ok(alerted, "installApp() explains manual install when no prompt is available");
 }
+
+console.log("\n# THEME (light/dark + per-class accent + custom palette)");
+ok(typeof w.applyTheme === "function", "applyTheme() present");
+w.chooseClass("druid");
+const root = d.documentElement;
+ok(root.dataset.theme === "light" || root.dataset.theme === "dark", "a data-theme mode is set");
+const druidAccent = root.style.getPropertyValue("--accent").trim().toLowerCase();
+ok(druidAccent === ev("CLASSES.druid.color").toLowerCase(), `accent matches the class colour (druid ${druidAccent})`);
+w.setThemeMode("light");
+ok(root.dataset.theme === "light", "setThemeMode('light') switches to light");
+w.setThemeMode("dark");
+ok(root.dataset.theme === "dark", "setThemeMode('dark') switches to dark");
+w.setThemeMode("auto");
+w.setCustomColor("accent", "#123456");
+ok(root.style.getPropertyValue("--accent").trim() === "#123456", "custom accent overrides the class colour");
+ok(ev("library.settings.custom.accent") === "#123456", "custom colour saved to settings");
+{
+  const saved = JSON.parse(w.localStorage.getItem("pf2eSpellbook.v3"));
+  ok(saved.settings && saved.settings.custom && saved.settings.custom.accent === "#123456", "settings persist to localStorage");
+}
+w.resetTheme();
+ok(ev("library.settings.custom") === null, "resetTheme clears the custom palette");
+ok(root.style.getPropertyValue("--accent").trim().toLowerCase() === ev("CLASSES.druid.color").toLowerCase(), "reset restores the class default accent");
+w.openMenu();
+const ap = d.getElementById("appearancePanel");
+ok(!!ap && /Reset to class default/.test(ap.innerHTML), "Appearance panel renders in the menu");
+ok(ap.querySelectorAll('input[type="color"]').length === 4, "four custom-colour pickers present");
+
+console.log("\n# NO EMOJI (class/nav/section markers are SVG or text)");
+const EMOJI = /\p{Emoji_Presentation}/u;
+ok(!EMOJI.test(html), "built index.html contains no emoji");
+ok(/class="icn"/.test(html), "inline SVG line icons are used");
+ok(ev('typeof iconSvg') === "function" && /<svg/.test(w.iconSvg("cleric")), "iconSvg() renders an inline SVG");
 
 console.log(`\n# RESULT: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

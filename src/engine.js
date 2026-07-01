@@ -77,14 +77,16 @@ function loadLibrary(){
   }catch(e){}
   try{ // migrate a single v2 character
     const v2=JSON.parse(localStorage.getItem(OLD_KEY));
-    if(v2 && v2.classId){ const c=Object.assign(blankChar(), v2); return {characters:{[c.id]:c}, activeId:c.id}; }
+    if(v2 && v2.classId){ const c=Object.assign(blankChar(), v2); return normalizeLib({characters:{[c.id]:c}, activeId:c.id}); }
   }catch(e){}
   const c=blankChar();
-  return {characters:{[c.id]:c}, activeId:c.id};
+  return normalizeLib({characters:{[c.id]:c}, activeId:c.id});
 }
+function defaultSettings(){ return { themeMode:"auto", custom:null }; }
 function normalizeLib(lib){
   Object.keys(lib.characters).forEach(id=>{ lib.characters[id]=Object.assign(defaultStateFields(), lib.characters[id], {id}); });
   if(!lib.characters[lib.activeId]) lib.activeId=Object.keys(lib.characters)[0];
+  lib.settings=Object.assign(defaultSettings(), lib.settings||{});
   return lib;
 }
 let _storageWarned=false;
@@ -92,9 +94,66 @@ function saveState(){
   library.characters[state.id]=state;
   try{ localStorage.setItem(LS_KEY, JSON.stringify(library)); }
   catch(e){
-    if(!_storageWarned && typeof toast==="function"){ toast("⚠ Couldn't save — storage full or disabled"); _storageWarned=true; }
+    if(!_storageWarned && typeof toast==="function"){ toast("Couldn't save — storage full or disabled"); _storageWarned=true; }
   }
 }
+function saveSettings(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(library)); }catch(e){} }
+
+/* ============================================================
+   THEME  (light/dark · per-class accent · custom palette)
+   The base palette flips with [data-theme]; --accent (and its readable
+   ink) is set per active class, or overridden by a custom palette.
+   ============================================================ */
+const DEFAULT_ACCENT="#6c7a89";
+function hexToRgb(h){
+  h=(h||"").replace("#","").trim();
+  if(h.length===3) h=h.split("").map(c=>c+c).join("");
+  const n=parseInt(h||"000000",16);
+  return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
+}
+function relLuminance(hex){
+  const {r,g,b}=hexToRgb(hex);
+  const f=v=>{ v/=255; return v<=.03928 ? v/12.92 : Math.pow((v+.055)/1.055,2.4); };
+  return .2126*f(r)+.7152*f(g)+.0722*f(b);
+}
+function inkFor(hex){ return relLuminance(hex) < .48 ? "#ffffff" : "#15171c"; }
+function mixHex(a,b,t){
+  const A=hexToRgb(a), B=hexToRgb(b);
+  const c=k=>Math.round(A[k]+(B[k]-A[k])*t).toString(16).padStart(2,"0");
+  return "#"+c("r")+c("g")+c("b");
+}
+function resolveThemeMode(){
+  const m=(library.settings&&library.settings.themeMode)||"auto";
+  if(m==="light"||m==="dark") return m;
+  try{ return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light"; }
+  catch(e){ return "dark"; }
+}
+function applyTheme(){
+  const root=document.documentElement;
+  const custom=(library.settings&&library.settings.custom)||null;
+  root.dataset.theme=resolveThemeMode();
+  const accent=(custom&&custom.accent) || (activeClass()&&activeClass().color) || DEFAULT_ACCENT;
+  root.style.setProperty("--accent", accent);
+  root.style.setProperty("--accent-ink", inkFor(accent));
+  // optional full-palette overrides (background / text)
+  if(custom&&custom.bg) root.style.setProperty("--bg", custom.bg); else root.style.removeProperty("--bg");
+  if(custom&&custom.ink) root.style.setProperty("--ink", custom.ink); else root.style.removeProperty("--ink");
+  if(custom&&custom.surface){
+    root.style.setProperty("--surface", custom.surface);
+    root.style.setProperty("--surface-2", mixHex(custom.surface, custom.ink||"#808080", .10));
+  }else{ root.style.removeProperty("--surface"); root.style.removeProperty("--surface-2"); }
+  // keep the browser chrome colour in step with the background
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta){ const bg=getComputedStyle(root).getPropertyValue("--bg").trim(); if(bg) meta.setAttribute("content", bg); }
+}
+function themeColorValue(token){ return (getComputedStyle(document.documentElement).getPropertyValue(token)||"").trim()||"#000000"; }
+function setThemeMode(m){ library.settings.themeMode=m; saveSettings(); applyTheme(); renderMenu(); }
+function setCustomColor(key,val){
+  library.settings.custom=library.settings.custom||{};
+  library.settings.custom[key]=val;
+  saveSettings(); applyTheme();
+}
+function resetTheme(){ library.settings.custom=null; saveSettings(); applyTheme(); renderMenu(); }
 
 /* ============================================================
    CLASS-AWARE HELPERS
@@ -157,7 +216,7 @@ function actionLabel(a){
   }
   const m=String(a).match(/^([1-3])\s*(?:to|or|–|-)\s*([1-3])$/);
   if(m) return `${ACTION_GLYPH[m[1]]}–${ACTION_GLYPH[m[2]]} ${m[1]} to ${m[2]} actions`;
-  return "🕑 "+a;
+  return a;
 }
 function titleCaseTrait(t){ return t.charAt(0).toUpperCase()+t.slice(1); }
 function escapeHtml(s){ return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
@@ -185,12 +244,11 @@ function scaleDamage(s, castRank){
 }
 function damageChipHTML(s, castRank){
   const ds=scaleDamage(s, castRank); if(!ds) return "";
-  const parts=ds.map(d=>{
-    const icon=d.healing?"✚":"💥";
+  return ds.map(d=>{
+    const cls=d.healing?"heal":"dmg";
     const ty=(d.type&&!d.healing)?" "+escapeHtml(d.type):"";
-    return `${icon} ${escapeHtml(d.formula)}${ty}`;
-  });
-  return `<span class="dmgchip">${parts.join(" &nbsp; ")}</span>`;
+    return `<span class="dmgchip ${cls}">${escapeHtml(d.formula)}${ty}</span>`;
+  }).join(" ");
 }
 
 function spellCardHTML(s, opts){
@@ -203,7 +261,7 @@ function spellCardHTML(s, opts){
   if(s.duration) m.push(`<b>Duration</b> ${escapeHtml(s.duration)}`);
   const meta = m.length?`<div class="meta">${m.join(" &nbsp;·&nbsp; ")}</div>`:"";
   const traits=`<div class="traits">${s.traits.map(t=>`<span class="trait">${escapeHtml(titleCaseTrait(t))}</span>`).join("")}</div>`;
-  const saveTag = s.save ? `<span class="save-tag">🛡 ${escapeHtml(s.save)}</span>` : "";
+  const saveTag = s.save ? `<span class="save-tag">${escapeHtml(s.save)}</span>` : "";
   const heighten = s.heightened ? `<div class="heighten"><b>Heightened</b> ${textToHtml(s.heightened)}</div>` : "";
   const note=legacyNote(s)?`<div class="meta" style="margin:-2px 0 4px"><span class="formerly">${escapeHtml(legacyNote(s))}</span></div>`:"";
   return `
@@ -226,7 +284,7 @@ function spellCardHTML(s, opts){
 function spellPreviewHTML(s, castRank){
   if(!s) return "";
   const heightNote=(castRank>s.rank)?` · cast at rank ${castRank}`:"";
-  const saveTag=s.save?` · 🛡 ${escapeHtml(s.save)}`:"";
+  const saveTag=s.save?` · ${escapeHtml(s.save)}`:"";
   const m=[];
   if(s.range) m.push(`<b>Range</b> ${escapeHtml(s.range)}`);
   if(s.area)  m.push(`<b>Area</b> ${escapeHtml(s.area)}`);
@@ -278,7 +336,7 @@ function toast(msg){
 function charSummary(c){
   if(!c.classId) return "New character — no class yet";
   const cl=CLASSES[c.classId];
-  return `${cl.icon} ${cl.name} · Level ${c.level}`;
+  return `${cl.name} · Level ${c.level}`;
 }
 function openMenu(){
   VIEWS.forEach(v=>document.getElementById("view-"+v).classList.add("hide"));
@@ -295,17 +353,32 @@ function renderMenu(){
     const c=library.characters[id];
     const active=id===library.activeId;
     return `<div class="classcard ${active?"activechar":""}">
-      <div class="ic">${c.classId?CLASSES[c.classId].icon:"＋"}</div>
+      <div class="ic" style="color:${c.classId?CLASSES[c.classId].color:"var(--muted)"}">${c.classId?iconSvg(CLASSES[c.classId].icon):iconSvg("plus")}</div>
       <div class="txt" onclick="switchCharacter('${id}')" style="cursor:pointer">
-        <div class="nm">${escapeHtml(c.name||(c.classId?CLASSES[c.classId].name:"Unnamed"))}${active?` <span class="previewtag" style="background:var(--gold);color:#2a1c0c;border-color:var(--gold)">active</span>`:""}</div>
+        <div class="nm">${escapeHtml(c.name||(c.classId?CLASSES[c.classId].name:"Unnamed"))}${active?` <span class="previewtag" style="background:var(--accent);color:var(--accent-ink);border-color:var(--accent)">active</span>`:""}</div>
         <div class="tl">${charSummary(c)}</div>
       </div>
       ${ids.length>1?`<button class="rmrow" title="delete" onclick="deleteCharacter('${id}')">✕</button>`:""}
     </div>`;
   }).join("");
   document.getElementById("menuList").innerHTML=list;
+  renderAppearance();
   showInstallButton(!!deferredInstall);
   const ds=document.getElementById("dataStamp"); if(ds) ds.textContent=dataStampText();
+}
+/* Appearance panel: Light/Dark/Auto + a four-swatch custom palette. */
+function renderAppearance(){
+  const box=document.getElementById("appearancePanel"); if(!box) return;
+  const mode=(library.settings&&library.settings.themeMode)||"auto";
+  const seg=["light","dark","auto"].map(m=>
+    `<button class="${mode===m?"on":""}" onclick="setThemeMode('${m}')">${m[0].toUpperCase()+m.slice(1)}</button>`).join("");
+  const rows=[["Background","bg","--bg"],["Surface","surface","--surface"],["Text","ink","--ink"],["Accent","accent","--accent"]]
+    .map(([label,key,token])=>`<div class="swatchrow"><label>${label}</label>
+      <input type="color" value="${themeColorValue(token)}" oninput="setCustomColor('${key}',this.value)" aria-label="${label} colour"></div>`).join("");
+  box.innerHTML=`<div class="seg" id="themeSeg">${seg}</div>
+    <p class="meta">Colours follow each class's theme by default. Pick your own below — they apply to every character.</p>
+    ${rows}
+    <button class="btn secondary" onclick="resetTheme()">Reset to class default</button>`;
 }
 function newCharacter(){ const c=blankChar(); library.characters[c.id]=c; library.activeId=c.id; state=c; saveState(); showClassPicker(); }
 function switchCharacter(id){
@@ -332,7 +405,7 @@ function exportCharacter(){
   const code="PF2E1:"+b64encode(JSON.stringify(c));
   const io=document.getElementById("menuIO");
   io.value=code; io.focus(); io.select();
-  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(code).then(()=>toast("📋 Copied to clipboard")).catch(()=>toast("Code ready — copy it")); }
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(code).then(()=>toast("Copied to clipboard")).catch(()=>toast("Code ready — copy it")); }
   else toast("Code ready — copy it");
 }
 function importCharacter(){
@@ -344,7 +417,7 @@ function importCharacter(){
     if(typeof obj!=="object"||!("level" in obj)) throw new Error("bad");
     const c=Object.assign(blankChar(), obj, {id:uid()});
     library.characters[c.id]=c; library.activeId=c.id; state=c; saveState();
-    toast("📥 Character imported");
+    toast("Character imported");
     if(!state.classId){ showClassPicker(); } else { renderHeader(); go(state.prepared?"today":"prepare"); }
   }catch(e){ alert("That code didn't work — make sure you pasted the whole thing."); }
 }
@@ -359,18 +432,19 @@ function showClassPicker(){
   const sec=document.getElementById("view-classpick");
   sec.classList.remove("hide");
   sec.innerHTML=`
-    <h1 style="text-align:center">📖 PF2e Spellbook</h1>
+    <h1 style="text-align:center">PF2e Spellbook</h1>
     <p class="meta" style="text-align:center;margin-bottom:18px">Choose your class to begin.</p>
     ${CLASS_ORDER.map(id=>{
       const c=CLASSES[id];
-      return `<button class="classcard" onclick="chooseClass('${id}')">
-        <div class="ic">${c.icon}</div>
+      return `<button class="classcard" style="border-left-color:${c.color}" onclick="chooseClass('${id}')">
+        <div class="ic" style="color:${c.color}">${iconSvg(c.icon)}</div>
         <div class="txt"><div class="nm">${c.name}${c.preview?` <span class="previewtag">preview</span>`:""}</div>
         <div class="tl">${c.tagline}</div></div>
         <div class="arr">→</div>
       </button>`;
     }).join("")}
     <p class="meta" style="text-align:center;margin-top:18px;font-size:.8rem">Pathfinder 2e (Remaster) · unofficial fan tool<br>${escapeHtml(dataStampText())}</p>`;
+  applyTheme();
   window.scrollTo(0,0);
 }
 function chooseClass(id){
@@ -381,8 +455,9 @@ function chooseClass(id){
   if(!hasFeature("divineFont")) state.font="heal";
   if(c.traditionFrom==="patron" && !state.patronTradition) state.patronTradition=c.defaultTradition||"occult";
   saveState();
+  applyTheme();
   renderHeader();
-  toast(`${c.icon} ${c.name} selected`);
+  toast(`${c.name} selected`);
   go(state.prepared ? "today" : "prepare");
 }
 function openClassPicker(){ showClassPicker(); }
@@ -392,7 +467,8 @@ function openClassPicker(){ showClassPicker(); }
    ============================================================ */
 function renderHeader(){
   const c=activeClass(); if(!c) return;
-  document.getElementById("charIcon").textContent=c.icon;
+  applyTheme();
+  document.getElementById("charIcon").innerHTML=iconSvg(c.icon);
   document.getElementById("charNameHead").textContent=state.name||c.name;
   document.getElementById("charSub").textContent=
     `${c.name} · Pathfinder 2e (Remaster) · ${TRADITION_LABEL[activeTradition()]} list`;
@@ -458,8 +534,8 @@ function renderCharExtra(){
       <label class="field"><span class="name">Divine Font</span>
       <span class="hint">Which one did you choose at level 1?</span></label>
       <div class="seg" id="fontSeg">
-        <button data-font="heal" class="heal ${state.font==="heal"?"on":""}" onclick="setFont('heal')">✚ Healing Font</button>
-        <button data-font="harm" class="harm ${state.font==="harm"?"on":""}" onclick="setFont('harm')">☠ Harmful Font</button>
+        <button data-font="heal" class="heal ${state.font==="heal"?"on":""}" onclick="setFont('heal')">${iconSvg("heal")} Healing Font</button>
+        <button data-font="harm" class="harm ${state.font==="harm"?"on":""}" onclick="setFont('harm')">${iconSvg("harm")} Harmful Font</button>
       </div>`;
   }
   if(c.traditionFrom==="bloodline"){
@@ -490,22 +566,22 @@ function renderPrepSummary(){
   let extra="";
   if(hasFeature("divineFont")){
     const fontName=state.font==="heal"?"Heal":"Harm";
-    extra+=`<div style="margin-top:4px">${state.font==="heal"?"✚":"☠"} Divine Font: <b>${fontCount()}× ${fontName}</b> (free, heightened to rank ${hr})</div>`;
+    extra+=`<div style="margin-top:4px">${iconSvg(state.font==="heal"?"heal":"harm")} Divine Font: <b>${fontCount()}× ${fontName}</b> (free, heightened to rank ${hr})</div>`;
   }
   getFeatures("extraSlots").forEach(f=>{
-    extra+=`<div style="margin-top:4px">${f.icon} ${f.label}: <b>+1</b> per rank</div>`;
+    extra+=`<div style="margin-top:4px">${iconSvg(f.icon)} ${f.label}: <b>+1</b> per rank</div>`;
   });
   getFeatures("dailyResource").forEach(f=>{
-    extra+=`<div style="margin-top:4px">${f.icon} ${f.label}: <b>${f.uses}×</b>/day</div>`;
+    extra+=`<div style="margin-top:4px">${iconSvg(f.icon)} ${f.label}: <b>${f.uses}×</b>/day</div>`;
   });
   if(hasFocus()){
-    extra+=`<div style="margin-top:4px">🔵 Focus pool: <b>${state.focusPool||1}</b> Focus Point${(state.focusPool||1)>1?"s":""} (focus spells heighten to rank ${focusRank()})</div>`;
+    extra+=`<div style="margin-top:4px">Focus pool: <b>${state.focusPool||1}</b> Focus Point${(state.focusPool||1)>1?"s":""} (focus spells heighten to rank ${focusRank()})</div>`;
   }
   document.getElementById("prepSummary").innerHTML=`
     <div class="meta" style="font-size:1rem">
-      <div>🎯 <b>Spell DC ${spellDC()}</b> &nbsp;·&nbsp; Spell attack ${spellAtk()}</div>
-      <div style="margin-top:8px">🪄 Cantrips ${isSpontaneous()?"known":""}: <b>${c.cantrips}</b></div>
-      <div style="margin-top:4px">📜 ${isSpontaneous()?"Slots (cast any known spell of that rank)":"Spell slots"}: ${slotText||"—"}</div>
+      <div><b>Spell DC ${spellDC()}</b> &nbsp;·&nbsp; Spell attack ${spellAtk()}</div>
+      <div style="margin-top:8px">Cantrips ${isSpontaneous()?"known":""}: <b>${c.cantrips}</b></div>
+      <div style="margin-top:4px">${isSpontaneous()?"Slots (cast any known spell of that rank)":"Spell slots"}: ${slotText||"—"}</div>
       ${extra}
     </div>`;
 }
@@ -549,14 +625,14 @@ function focusPicksHTML(){
       <span class="fcname">${escapeHtml(s.name)}</span><span class="fcrank">${rank}</span></label>`;
   }).join("");
   return `<div class="slotgroup">
-    <h3>🔵 Focus spells <span class="count" style="font-weight:600;color:var(--muted)">(pool of ${pool})</span></h3>
+    <h3>Focus spells <span class="count" style="font-weight:600;color:var(--muted)">(pool of ${pool})</span></h3>
     <p class="meta">Focus spells cost <b>Focus Points</b> (shared pool, max 3) and auto-heighten to rank ${focusRank()}. <b>Refocus</b> restores points. Check the ones you know — type below to filter to your domain / bloodline / order.</p>
     <label class="field" style="margin:8px 0"><span class="name">Focus Point pool</span>
       <span class="hint">1 + 1 per extra focus feat, up to 3</span>
       <select id="inFocusPool" onchange="setFocusPool(this.value)">
         ${[1,2,3].map(n=>`<option value="${n}" ${n===pool?"selected":""}>${n} Focus Point${n>1?"s":""}</option>`).join("")}
       </select></label>
-    <input type="text" id="focusFilter" placeholder="🔍 filter focus spells (name or trait)…" oninput="filterFocusChecklist(this.value)" aria-label="filter focus spells">
+    <input type="text" id="focusFilter" placeholder="Filter focus spells (name or trait)…" oninput="filterFocusChecklist(this.value)" aria-label="filter focus spells">
     <div class="focus-checklist" id="focusChecklist">${rows}</div>
   </div>`;
 }
@@ -574,7 +650,7 @@ function gatherFocus(){
 function cantripPicksHTML(){
   const c=activeClass();
   const prev=(state.prepared&&state.prepared.cantrips)||[];
-  let html=`<div class="slotgroup"><h3>🪄 Cantrips (pick ${c.cantrips})</h3>`;
+  let html=`<div class="slotgroup"><h3>Cantrips (pick ${c.cantrips})</h3>`;
   for(let i=0;i<c.cantrips;i++){
     const sel=prev[i]||"", pid="cprev"+i;
     html+=`<div class="prep-slot">
@@ -597,10 +673,10 @@ function preparedSlotsHTML(){
     const fontName=state.font==="heal"?"Heal":"Harm";
     const fontSpell=findSpell(state.font==="heal"?feat.healSlug:feat.harmSlug);
     html+=`<div class="slotgroup">
-      <h3>${state.font==="heal"?"✚":"☠"} Divine Font — ${fontName} (free slots)</h3>
+      <h3>${iconSvg(state.font==="heal"?"heal":"harm")} Divine Font — ${fontName} (free slots)</h3>
       <p class="meta">These ${fontCount()} castings are free and separate from your normal slots, usable only for <b>${fontName}</b>, auto-heightened to rank ${hr}.</p>`;
     for(let i=0;i<fontCount();i++){
-      html+=`<div class="slotrow"><div class="num">${state.font==="heal"?"✚":"☠"}</div>
+      html+=`<div class="slotrow"><div class="num">${iconSvg(state.font==="heal"?"heal":"harm")}</div>
         <select disabled><option>${fontName} (rank ${hr})</option></select></div>`;
     }
     html+=`<div class="prep-preview">${spellPreviewHTML(fontSpell, hr)}</div></div>`;
@@ -610,7 +686,7 @@ function preparedSlotsHTML(){
   Object.keys(slots).map(Number).sort((a,b)=>b-a).forEach(r=>{
     const n=slots[r];
     const prev=prevSlots[r]||[];
-    html+=`<div class="slotgroup"><h3>📜 Rank ${r} slots (${n})</h3>`;
+    html+=`<div class="slotgroup"><h3>Rank ${r} slots (${n})</h3>`;
     for(let i=0;i<n;i++){
       const sel=prev[i]||"", pid="sprev"+r+"_"+i;
       html+=`<div class="prep-slot">
@@ -623,7 +699,7 @@ function preparedSlotsHTML(){
       const ex=(prevExtra[f.key]&&prevExtra[f.key][r]&&prevExtra[f.key][r][0])||"";
       const pid="xprev"+f.key+r;
       html+=`<div class="prep-slot">
-        <div class="slotrow"><div class="num">${f.icon}</div>
+        <div class="slotrow"><div class="num">${iconSvg(f.icon)}</div>
         <select class="extraSel" data-key="${f.key}" data-rank="${r}" data-castrank="${r}" data-preview="${pid}" onchange="updatePreview(this)">${spellOptions(r, ex, false)}</select></div>
         <div class="prep-preview" id="${pid}">${spellPreviewHTML(findSpell(ex),r)}</div></div>`;
     });
@@ -655,7 +731,7 @@ function repertoireHTML(){
     const count=Math.max(known.length, slots[r]||0);
     if(!count) continue;   // no slots of this rank (e.g. a summoner's shed low ranks) → no repertoire of that rank
     html+=`<div class="slotgroup" data-reprank="${r}">
-      <h3>📜 Rank ${r} spells known <span class="count" style="font-weight:600;color:var(--muted)">(${slots[r]||0} slot${(slots[r]||0)===1?"":"s"}/day)</span></h3>
+      <h3>Rank ${r} spells known <span class="count" style="font-weight:600;color:var(--muted)">(${slots[r]||0} slot${(slots[r]||0)===1?"":"s"}/day)</span></h3>
       <div class="repRows" id="repRows-${r}">`;
     for(let i=0;i<count;i++){
       const e=known[i]||{};
@@ -705,7 +781,7 @@ function savePrep(){
   }
   if(focus) state.prepared.focus=focus;
   saveState();
-  toast("✨ Prepared for the day!");
+  toast("Prepared for the day!");
   go("today");
 }
 
@@ -718,7 +794,7 @@ function todayHeaderHTML(){
   return `<div class="card" style="text-align:center">
     <div style="font-size:1.1rem"><b>${escapeHtml(state.name||c.name)}</b> · ${c.name} · Level ${state.level}</div>
     <div class="meta" style="font-size:1rem;margin-top:6px">Spell DC <b>${spellDC()}</b> &nbsp;·&nbsp; Spell attack <b>${spellAtk()}</b></div>
-    <button class="btn secondary" style="margin-top:12px" onclick="newDay()">🌅 Rest &amp; reset the day</button>
+    <button class="btn secondary" style="margin-top:12px" onclick="newDay()">Rest &amp; reset the day</button>
   </div>`;
 }
 function dailyResourceHTML(){
@@ -730,7 +806,7 @@ function dailyResourceHTML(){
     const btn=done?`<button class="castbtn zero" onclick="uncast('${key}')">↩ undo</button>`
                   :`<button class="castbtn" onclick="doCast('${key}',${f.uses})">Use</button>`;
     html+=`<div class="cast-card ${done?"spent":""}">
-      <div class="cast-top"><div class="nm">${f.icon} ${f.label}</div><div class="uses">${pips} ${btn}</div></div>
+      <div class="cast-top"><div class="nm">${iconSvg(f.icon)} ${f.label}</div><div class="uses">${pips} ${btn}</div></div>
       <div class="meta">${escapeHtml(f.note||"")}</div></div>`;
   });
   return html;
@@ -756,7 +832,7 @@ function focusSectionHTML(p){
   const fr=focusRank();
   let pips=""; for(let k=0;k<pool;k++){ pips+=`<span class="pip ${k<remaining?"full":"spent"}"></span>`; }
   const refocus=`<button class="castbtn ${spent>0?"":"zero"}" ${spent>0?"":"disabled"} style="margin-left:8px" onclick="refocus()">↻ Refocus</button>`;
-  let html=`<div class="sectionhead">🔵 Focus spells <span class="count">${remaining}/${pool} point${pool>1?"s":""}</span></div>
+  let html=`<div class="sectionhead">Focus spells <span class="count">${remaining}/${pool} point${pool>1?"s":""}</span></div>
     <div style="margin:2px 0 8px"><span class="uses">${pips}${refocus}</span></div><div class="divider"></div>`;
   f.spells.forEach((slug,i)=>{
     const s=findSpell(slug); if(!s) return;
@@ -768,16 +844,16 @@ function focusSectionHTML(p){
               : (out ? `<button class="castbtn zero" disabled>No points</button>`
                      : `<button class="castbtn" onclick="castFocus(${pool})">Cast</button>`);
     const detailsId="f_"+i;
-    html+=`<div class="cast-card ${out?"spent":""}" style="border-left-color:#9b7fd6">
-      <div class="cast-top"><div class="nm">🔵 ${escapeHtml(s.name)} ${heightNote}</div><div class="uses">${btn}</div></div>
-      <div class="meta">${actionLabel(s.actions)}${s.save?` · 🛡 ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
+    html+=`<div class="cast-card ${out?"spent":""}" style="border-left-color:var(--accent)">
+      <div class="cast-top"><div class="nm">${escapeHtml(s.name)} ${heightNote}</div><div class="uses">${btn}</div></div>
+      <div class="meta">${actionLabel(s.actions)}${s.save?` · ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
       <button class="detailsbtn" onclick="toggleDetails('${detailsId}',this)">Show details ▾</button>
       <div id="${detailsId}" class="hide" style="margin-top:10px">${spellCardHTML(s)}</div></div>`;
   });
   return html;
 }
 function castFocus(pool){ const key="focuspool"; state.cast[key]=Math.min(pool,(state.cast[key]||0)+1); saveState(); renderToday(); }
-function refocus(){ state.cast["focuspool"]=0; saveState(); renderToday(); toast("🔵 Refocused"); }
+function refocus(){ state.cast["focuspool"]=0; saveState(); renderToday(); toast("Refocused"); }
 
 function renderTodayPrepared(p){
   let html=todayHeaderHTML();
@@ -785,12 +861,12 @@ function renderTodayPrepared(p){
 
   if(p.divineFont){
     const f=p.divineFont; const fontSpell=findSpell(f.fontSlug);
-    html+=`<div class="sectionhead">${f.font==="heal"?"✚":"☠"} Divine Font — ${f.fontName} <span class="count">free</span></div><div class="divider"></div>`;
+    html+=`<div class="sectionhead">${iconSvg(f.font==="heal"?"heal":"harm")} Divine Font — ${f.fontName} <span class="count">free</span></div><div class="divider"></div>`;
     html+=castableCard(fontSpell,"font",f.fontRank,f.fontCount,f.fontRank,0,{cls:f.font});
   }
 
   if(p.cantrips && p.cantrips.length){
-    html+=`<div class="sectionhead">🪄 Cantrips <span class="count">unlimited</span></div><div class="divider"></div>`;
+    html+=`<div class="sectionhead">Cantrips <span class="count">unlimited</span></div><div class="divider"></div>`;
     p.cantrips.forEach((slug,i)=>{ const s=findSpell(slug); if(!s) return; html+=castableCard(s,"cantrip",0,Infinity,0,i); });
   }
 
@@ -800,7 +876,7 @@ function renderTodayPrepared(p){
     const extras=[];
     extraFeats.forEach(f=>{ const v=p.extra&&p.extra[f.key]&&p.extra[f.key][r]&&p.extra[f.key][r][0]; if(v) extras.push({f,slug:v}); });
     if(!arr.length && !extras.length) return;
-    html+=`<div class="sectionhead">📜 Rank ${r} spells <span class="count">${arr.length+extras.length} slot${(arr.length+extras.length)>1?"s":""}</span></div><div class="divider"></div>`;
+    html+=`<div class="sectionhead">Rank ${r} spells <span class="count">${arr.length+extras.length} slot${(arr.length+extras.length)>1?"s":""}</span></div><div class="divider"></div>`;
     (p.slots[r]||[]).forEach((slug,i)=>{ if(!slug) return; const s=findSpell(slug); if(!s) return; html+=castableCard(s,"slot",r,1,r,i); });
     extras.forEach(({f,slug})=>{ const s=findSpell(slug); if(!s) return; html+=castableCard(s,"extra_"+f.key,r,1,r,0,{label:f.icon}); });
   });
@@ -812,7 +888,7 @@ function renderTodaySpontaneous(p){
   html+=dailyResourceHTML();
 
   if(p.cantrips && p.cantrips.length){
-    html+=`<div class="sectionhead">🪄 Cantrips <span class="count">unlimited</span></div><div class="divider"></div>`;
+    html+=`<div class="sectionhead">Cantrips <span class="count">unlimited</span></div><div class="divider"></div>`;
     p.cantrips.forEach((slug,i)=>{ const s=findSpell(slug); if(!s) return; html+=castableCard(s,"cantrip",0,Infinity,0,i); });
   }
 
@@ -829,7 +905,7 @@ function renderTodaySpontaneous(p){
 
     let pips=""; for(let k=0;k<max;k++){ pips+=`<span class="pip ${k<remaining?"full":"spent"}"></span>`; }
     const undo = spent>0 ? `<button class="castbtn zero" style="margin-left:8px" onclick="uncastPool(${R})">↩</button>` : "";
-    html+=`<div class="sectionhead">📜 Rank ${R} <span class="count">${remaining}/${max} slot${max>1?"s":""} left</span></div>
+    html+=`<div class="sectionhead">Rank ${R} <span class="count">${remaining}/${max} slot${max>1?"s":""} left</span></div>
       <div style="margin:2px 0 8px"><span class="uses">${pips}${undo}</span></div><div class="divider"></div>`;
 
     known.forEach((e,i)=>{ const s=findSpell(e.slug); if(!s) return; html+=poolSpellCard(s,R,R,remaining,max,"k"+i,e.sig); });
@@ -849,7 +925,7 @@ function castableCard(s, kind, rank, uses, castRank, idx, opts){
   const isSpent=!unlimited && remaining<=0;
   const cls = opts.cls || (isSpent?"":cardClass(s));
   const heightNote=(castRank>s.rank)?`<span class="meta"> · cast at rank ${castRank}</span>`:"";
-  const tag = opts.label?`<span class="slottag">${opts.label}</span> `:"";
+  const tag = opts.label?`<span class="slottag">${iconSvg(opts.label)}</span> `:"";
 
   let usesHtml="";
   if(unlimited){ usesHtml=`<span class="unlim">∞ at will</span>`; }
@@ -868,7 +944,7 @@ function castableCard(s, kind, rank, uses, castRank, idx, opts){
       <div class="nm">${tag}${escapeHtml(s.name)} ${heightNote}</div>
       <div class="uses">${usesHtml} ${btn} ${sustainBtn(s)}</div>
     </div>
-    <div class="meta">${actionLabel(s.actions)}${s.save?` · 🛡 ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
+    <div class="meta">${actionLabel(s.actions)}${s.save?` · ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
     <button class="detailsbtn" onclick="toggleDetails('${detailsId}',this)">Show details ▾</button>
     <div id="${detailsId}" class="hide" style="margin-top:10px">${spellCardHTML(s,{cls})}</div>
   </div>`;
@@ -889,7 +965,7 @@ function poolSpellCard(s, poolRank, castRank, remaining, max, uid, sig){
       <div class="nm">${star}${escapeHtml(s.name)} ${heightNote}</div>
       <div class="uses">${btn} ${sustainBtn(s)}</div>
     </div>
-    <div class="meta">${actionLabel(s.actions)}${s.save?` · 🛡 ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
+    <div class="meta">${actionLabel(s.actions)}${s.save?` · ${escapeHtml(s.save)}`:""}${s.range?` · ${escapeHtml(s.range)}`:""}</div>${damageChipHTML(s,castRank)?`<div class="dmgline">${damageChipHTML(s,castRank)}</div>`:""}
     <button class="detailsbtn" onclick="toggleDetails('${detailsId}',this)">Show details ▾</button>
     <div id="${detailsId}" class="hide" style="margin-top:10px">${spellCardHTML(s)}</div>
   </div>`;
@@ -900,22 +976,22 @@ function doCast(key,max){ state.cast[key]=(state.cast[key]||0)+1; if(state.cast[
 function uncast(key){ state.cast[key]=Math.max(0,(state.cast[key]||0)-1); saveState(); renderToday(); }
 function castPool(rank,max){ const key="pool:"+rank; state.cast[key]=Math.min(max,(state.cast[key]||0)+1); saveState(); renderToday(); }
 function uncastPool(rank){ const key="pool:"+rank; state.cast[key]=Math.max(0,(state.cast[key]||0)-1); saveState(); renderToday(); }
-function newDay(){ if(confirm("Reset all spent slots for a new day? Your prepared list stays the same.")){ state.cast={}; state.sustaining=[]; saveState(); renderToday(); toast("🌅 A new day dawns!"); } }
+function newDay(){ if(confirm("Reset all spent slots for a new day? Your prepared list stays the same.")){ state.cast={}; state.sustaining=[]; saveState(); renderToday(); toast("A new day dawns!"); } }
 
 /* ---- Sustained-spell tracker ---- */
 function sustainBtn(s){
   if(!s || !s.sustained) return "";
   const on=(state.sustaining||[]).includes(s.slug);
-  return on ? `<button class="susbtn on" onclick="endSustain('${s.slug}')">⏳ End</button>`
-            : `<button class="susbtn" onclick="startSustain('${s.slug}')">⏳ Sustain</button>`;
+  return on ? `<button class="susbtn on" onclick="endSustain('${s.slug}')">End</button>`
+            : `<button class="susbtn" onclick="startSustain('${s.slug}')">Sustain</button>`;
 }
-function startSustain(slug){ state.sustaining=state.sustaining||[]; if(!state.sustaining.includes(slug)){ state.sustaining.push(slug); saveState(); renderToday(); toast("⏳ Now sustaining"); } }
+function startSustain(slug){ state.sustaining=state.sustaining||[]; if(!state.sustaining.includes(slug)){ state.sustaining.push(slug); saveState(); renderToday(); toast("Now sustaining"); } }
 function endSustain(slug){ state.sustaining=(state.sustaining||[]).filter(x=>x!==slug); saveState(); renderToday(); }
 function sustainingBarHTML(){
   const list=(state.sustaining||[]).filter(slug=>findSpell(slug));
   if(!list.length) return "";
-  return `<div class="card" style="border-left:6px solid var(--accent)">
-    <div class="sectionhead" style="margin:0 0 6px">⏳ Sustaining now <span class="count">spend an action each turn</span></div>
+  return `<div class="card" style="border-left:5px solid var(--info)">
+    <div class="sectionhead" style="margin:0 0 6px">Sustaining now <span class="count">spend an action each turn</span></div>
     ${list.map(slug=>{const s=findSpell(slug); return `<div class="susrow"><span>${escapeHtml(s.name)}</span><button class="castbtn zero" onclick="endSustain('${slug}')">✓ End</button></div>`;}).join("")}
   </div>`;
 }
@@ -958,8 +1034,8 @@ function renderBrowseFilters(){
 function renderRankChips(){
   const ranks=[["all","All"],["0","Cantrips"]];
   for(let r=1;r<=10;r++) ranks.push([String(r),"Rank "+r]);
-  if(hasFocus()) ranks.push(["focus","🔵 Focus"]);
-  ranks.push(["rituals","📜 Rituals"]);
+  if(hasFocus()) ranks.push(["focus","Focus"]);
+  ranks.push(["rituals","Rituals"]);
   document.getElementById("rankChips").innerHTML=
     ranks.map(([v,l])=>`<button class="chip ${browseRank===v?"on":""}" onclick="setBrowseRank('${v}')">${l}</button>`).join("");
 }
@@ -994,7 +1070,7 @@ function renderBrowse(){
 }
 /* Lightweight collapsed row; the full card renders on demand when tapped. */
 function browseRowHTML(s){
-  const save=s.save?` · 🛡 ${escapeHtml(s.save)}`:"";
+  const save=s.save?` · ${escapeHtml(s.save)}`:"";
   const note=legacyNote(s)?` <span class="formerly">${escapeHtml(legacyNote(s))}</span>`:"";
   return `<div class="browse-row rank${s.rank}">
     <button class="browse-row-head" onclick="toggleBrowse('${s.slug}',this)">
@@ -1105,6 +1181,14 @@ function downloadOffline(){
 
 function init(){
   setupInstall();
+  applyTheme();
+  try{
+    if(window.matchMedia){
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{
+        if(((library.settings&&library.settings.themeMode)||"auto")==="auto") applyTheme();
+      });
+    }
+  }catch(e){}
   if(!state.classId){ showClassPicker(); }
   else { renderHeader(); go(state.prepared?"today":"prepare"); }
 }

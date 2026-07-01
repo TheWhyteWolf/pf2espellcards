@@ -52,6 +52,46 @@ function psychicSlots(level){
   return slots;
 }
 
+/* ============================================================
+   INLINE SVG ICON REGISTRY
+   Thin line icons (24x24, stroke = currentColor) so they inherit the
+   active accent colour. Keyed by name; classes/features reference a key
+   instead of an emoji. iconSvg() wraps the path data in an <svg>.
+   ============================================================ */
+const ICONS={
+  /* classes */
+  cleric:'<circle cx="12" cy="12" r="3.4"/><path d="M12 3v2.6M12 18.4V21M3 12h2.6M18.4 12H21M5.6 5.6l1.9 1.9M16.5 16.5l1.9 1.9M18.4 5.6l-1.9 1.9M7.5 16.5l-1.9 1.9"/>',
+  wizard:'<path d="M12 3.5 4.5 19.5h15z"/><circle cx="12" cy="13.5" r="1.9"/>',
+  druid:'<path d="M5 19.5C5 11 10.5 5 19 4.5 19 13 13.5 19 5 19.5z"/><path d="M11.5 12 5 19.5"/>',
+  witch:'<path d="M17.5 15.2A6 6 0 1 1 11.3 5a5 5 0 0 0 6.2 10.2z"/><path d="M18.3 3.6l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>',
+  sorcerer:'<path d="M12 3c2.8 3.6 4.6 5.6 4.6 8.4a4.6 4.6 0 0 1-9.2 0c0-1.2.6-2.2 1.6-3.1.3 1.1 1 1.6 1.6 1.6C9.4 8.4 10.3 5.7 12 3z"/>',
+  bard:'<path d="M9.5 17.5V6.2l9-2v9.6"/><circle cx="6.8" cy="17.5" r="2.4"/><circle cx="15.8" cy="15.8" r="2.4"/>',
+  oracle:'<path d="M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="2.4"/>',
+  magus:'<path d="M17.5 3.5 20.5 6.5 12 15l-3 1 1-3z"/><path d="M8 14l-4 4"/><path d="M5.5 15.5l3 3"/>',
+  summoner:'<circle cx="9.2" cy="12" r="4.8"/><circle cx="14.8" cy="12" r="4.8"/>',
+  psychic:'<path d="M12 12a1.5 1.5 0 1 0 1.6-1.5A3.6 3.6 0 1 0 8.4 12 5.7 5.7 0 1 0 17.7 7.7"/>',
+  animist:'<path d="M12 3c2 2.5 3.1 4 3.1 6a3.1 3.1 0 0 1-6.2 0c0-1 .5-2 1.5-2.9.3.8.8 1.2 1.3 1.2C11 6 11 5 12 3z"/><path d="M12 12v6"/><path d="M9 21h6"/>',
+  /* navigation */
+  today:'<rect x="7" y="3.5" width="12.5" height="17" rx="2"/><path d="M4.5 7v11.5a2 2 0 0 0 2 2h9.5"/>',
+  prepare:'<path d="M3 18.5h18"/><path d="M6.5 18.5a5.5 5.5 0 0 1 11 0"/><path d="M12 3v3M4.2 8.7l1.7 1.7M19.8 8.7l-1.7 1.7"/>',
+  browse:'<path d="M4 5.2A2 2 0 0 1 6 3.2h5.2v15.6H6a2 2 0 0 0-2 2z"/><path d="M20 5.2a2 2 0 0 0-2-2h-5.2v15.6H18a2 2 0 0 1 2 2z"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.4 9.4a2.6 2.6 0 1 1 3.6 2.4c-.9.5-1.1 1-1.1 1.9"/><path d="M12 16.7v.01"/>',
+  /* features / utility */
+  school:'<path d="M2.5 8.5 12 4.5l9.5 4-9.5 4z"/><path d="M6.5 10.5v4c0 1.5 11 1.5 11 0v-4"/><path d="M21.5 8.5v5"/>',
+  bonded:'<path d="M9.3 12.4a3 3 0 0 1 0-4.2l1.9-1.9a3 3 0 0 1 4.2 4.2l-1 1"/><path d="M14.7 11.6a3 3 0 0 1 0 4.2l-1.9 1.9a3 3 0 0 1-4.2-4.2l1-1"/>',
+  heal:'<path d="M12 5.5v13M5.5 12h13"/>',
+  harm:'<path d="M12 3a7 7 0 0 0-7 7c0 2 1 3.6 2.2 4.6V17a1 1 0 0 0 1 1h7.6a1 1 0 0 0 1-1v-2.4C19 13.6 20 12 20 10a7 7 0 0 0-7-7z" transform="translate(-1 0)"/><circle cx="8.5" cy="10.5" r="1.1"/><circle cx="13.5" cy="10.5" r="1.1"/><path d="M9 18v2M11 18v2M13 18v2"/>',
+  menu:'<circle cx="12" cy="8" r="3.4"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/>',
+  filter:'<path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="17" r="2"/>',
+  plus:'<path d="M12 5.5v13M5.5 12h13"/>',
+  book:'<path d="M12 6.5C9.5 4.7 6 4.7 3.5 6v13c2.5-1.3 6-1.3 8.5.5 2.5-1.8 6-1.8 8.5-.5V6c-2.5-1.3-6-1.3-8.5.5z"/><path d="M12 6.5v13"/>',
+};
+function iconSvg(name, cls){
+  return '<svg class="icn '+(cls||"")+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" '+
+    'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+    (ICONS[name]||"")+'</svg>';
+}
+
 /* [minLevel, proficiency bonus] for spell DC / spell attack, highest first.
    Bonus = 2/4/6/8 for trained/expert/master/legendary.
    Wizard, Druid, Sorcerer, Bard, Oracle, Psychic and the Cloistered Cleric
@@ -99,13 +139,13 @@ const CORE_HELP=[
   ["Remaster vs. legacy (original) rules",
    "This app uses the current <b>Remaster</b> spell names and rules. If your group still plays the <b>original</b> (pre-Remaster) edition, most spells are identical — and renamed ones show a small <i>“formerly …”</i> note, so you can also <b>search by the old name</b> (e.g. searching <b>Magic Missile</b> finds <b>Force Barrage</b>). A few legacy spells that weren't changed are still listed under their original names too.<br><br>A few wording changes to keep in mind: spell <b>rank</b> = spell <b>level</b>; <b>vitality</b>/<b>void</b> damage = the old <b>positive</b>/<b>negative</b>; and <b>holy</b>/<b>unholy</b> replace the old <b>good</b>/<b>evil</b> alignment damage. The numbers and effects are the same."],
   ["Multiple characters, backup & sharing",
-   "Tap the <b>👤</b> button (top right) to keep <b>several characters</b> and switch between them — each remembers its own prepared spells. From there you can also <b>Export</b> a character to a code to back it up or send to a friend, and <b>Import</b> a code someone shares with you. Everything is stored on your device."],
+   "Tap the <b>character</b> button (top right) to keep <b>several characters</b> and switch between them — each remembers its own prepared spells. From there you can also <b>Export</b> a character to a code to back it up or send to a friend, and <b>Import</b> a code someone shares with you. Everything is stored on your device."],
 ];
 
 const CLASSES={
   /* ---------------- CLERIC ---------------- */
   cleric:{
-    id:"cleric", name:"Cleric", icon:"⛪",
+    id:"cleric", name:"Cleric", icon:"cleric", color:"#d8a23a",
     tagline:"Divine prepared caster · the party's main healer",
     tradition:"divine", keyAbility:"Wisdom", keyAbilityShort:"Wis",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
@@ -128,30 +168,30 @@ const CLASSES={
 
   /* ---------------- WIZARD ---------------- */
   wizard:{
-    id:"wizard", name:"Wizard", icon:"🪄",
+    id:"wizard", name:"Wizard", icon:"wizard", color:"#7b6cf0",
     tagline:"Arcane prepared caster · the widest spell list",
     tradition:"arcane", keyAbility:"Intelligence", keyAbilityShort:"Int",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
     preview:true,
     features:[
-      {type:"extraSlots", key:"school", icon:"🎓", label:"Arcane school slot",
+      {type:"extraSlots", key:"school", icon:"school", label:"Arcane school slot",
        note:"One extra slot of each rank you can cast, which must hold a spell from your chosen school / curriculum."},
-      {type:"dailyResource", key:"bonded", icon:"🔗", label:"Drain Bonded Item", uses:1,
+      {type:"dailyResource", key:"bonded", icon:"bonded", label:"Drain Bonded Item", uses:1,
        note:"Once per day, recast a spell you already cast today without spending its slot."},
     ],
     help:[
       ["What does a wizard do?",
        "You're an <b>Arcane</b> prepared caster with the broadest spell list in the game. You Prepare spells each morning from your spellbook, leaning on control and damage like <b>Fireball</b> plus utility."],
       ["Arcane school slot",
-       "Your school (curriculum) gives you <b>one extra prepared slot of every rank</b> you can cast. Fill the 🎓 slots with spells from your school. The app adds these slots automatically."],
+       "Your school (curriculum) gives you <b>one extra prepared slot of every rank</b> you can cast. Fill the <b>school</b> slots with spells from your school. The app adds these slots automatically."],
       ["Drain Bonded Item",
-       "Once per day you can <b>Drain your Bonded Item</b> to recast a spell you've already cast that day, without spending another slot. Tick the 🔗 tracker on Cast Today when you use it."],
+       "Once per day you can <b>Drain your Bonded Item</b> to recast a spell you've already cast that day, without spending another slot. Tick the <b>Drain Bonded Item</b> tracker on Cast Today when you use it."],
     ],
   },
 
   /* ---------------- DRUID ---------------- */
   druid:{
-    id:"druid", name:"Druid", icon:"🌿",
+    id:"druid", name:"Druid", icon:"druid", color:"#4faf6d",
     tagline:"Primal prepared caster · nature's versatility",
     tradition:"primal", keyAbility:"Wisdom", keyAbilityShort:"Wis",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
@@ -165,7 +205,7 @@ const CLASSES={
 
   /* ---------------- WITCH ---------------- */
   witch:{
-    id:"witch", name:"Witch", icon:"🔮",
+    id:"witch", name:"Witch", icon:"witch", color:"#b061b8",
     tagline:"Prepared caster · your patron sets the tradition",
     traditionFrom:"patron", defaultTradition:"occult",
     keyAbility:"Intelligence", keyAbilityShort:"Int",
@@ -180,7 +220,7 @@ const CLASSES={
 
   /* ---------------- SORCERER ---------------- */
   sorcerer:{
-    id:"sorcerer", name:"Sorcerer", icon:"✨",
+    id:"sorcerer", name:"Sorcerer", icon:"sorcerer", color:"#e05a52",
     tagline:"Spontaneous caster · magic in the blood",
     traditionFrom:"bloodline", keyAbility:"Charisma", keyAbilityShort:"Cha",
     casting:"spontaneous", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
@@ -199,7 +239,7 @@ const CLASSES={
 
   /* ---------------- BARD ---------------- */
   bard:{
-    id:"bard", name:"Bard", icon:"🎵",
+    id:"bard", name:"Bard", icon:"bard", color:"#34a8c4",
     tagline:"Occult spontaneous caster · master of support",
     tradition:"occult", keyAbility:"Charisma", keyAbilityShort:"Cha",
     casting:"spontaneous", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
@@ -218,7 +258,7 @@ const CLASSES={
 
   /* ---------------- ORACLE ---------------- */
   oracle:{
-    id:"oracle", name:"Oracle", icon:"👁",
+    id:"oracle", name:"Oracle", icon:"oracle", color:"#c061d6",
     tagline:"Divine spontaneous caster · power at a price",
     tradition:"divine", keyAbility:"Charisma", keyAbilityShort:"Cha",
     casting:"spontaneous", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
@@ -236,7 +276,7 @@ const CLASSES={
   },
   /* ---------------- MAGUS ---------------- */
   magus:{
-    id:"magus", name:"Magus", icon:"⚔️",
+    id:"magus", name:"Magus", icon:"magus", color:"#5d82e0",
     tagline:"Arcane half-caster · blade and spell as one",
     tradition:"arcane", keyAbility:"Intelligence", keyAbilityShort:"Int",
     casting:"prepared", slots:"partial", prof:PARTIAL_CASTER_PROF, cantrips:5,
@@ -252,7 +292,7 @@ const CLASSES={
 
   /* ---------------- SUMMONER ---------------- */
   summoner:{
-    id:"summoner", name:"Summoner", icon:"👹",
+    id:"summoner", name:"Summoner", icon:"summoner", color:"#2bb59a",
     tagline:"Half-caster · you and your eidolon, as one",
     traditionFrom:"patron", defaultTradition:"arcane",
     traditionChoiceLabel:"Eidolon's tradition",
@@ -274,7 +314,7 @@ const CLASSES={
 
   /* ---------------- PSYCHIC ---------------- */
   psychic:{
-    id:"psychic", name:"Psychic", icon:"🧠",
+    id:"psychic", name:"Psychic", icon:"psychic", color:"#e05fa6",
     tagline:"Occult spontaneous caster · few spells, mighty cantrips",
     tradition:"occult", keyAbility:"Int or Cha", keyAbilityShort:"Key",
     casting:"spontaneous", slots:"psychic", prof:FULL_CASTER_PROF, cantrips:5,
@@ -293,7 +333,7 @@ const CLASSES={
 
   /* ---------------- ANIMIST ---------------- */
   animist:{
-    id:"animist", name:"Animist", icon:"🕯️",
+    id:"animist", name:"Animist", icon:"animist", color:"#e08a3c",
     tagline:"Divine prepared caster · channels apparitions (spirits)",
     tradition:"divine", keyAbility:"Wisdom", keyAbilityShort:"Wis",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:4,

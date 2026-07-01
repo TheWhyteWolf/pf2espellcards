@@ -2,7 +2,7 @@
    Network-first for the app page (fresh when online, cached when offline),
    cache-first for static assets. Cache version is stamped at build time so a
    redeploy refreshes clients automatically. */
-const CACHE = "pf2e-spellbook-20260627130553";
+const CACHE = "pf2e-spellbook-20260701080150";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (e) => {

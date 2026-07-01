@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Spellbook">
-  <rect width="512" height="512" rx="104" fill="#231710"/>
-  <g fill="none" stroke="#e0b252" stroke-width="22" stroke-linejoin="round" stroke-linecap="round">
+  <rect width="512" height="512" rx="104" fill="#1d2027"/>
+  <g fill="none" stroke="#7b6cf0" stroke-width="22" stroke-linejoin="round" stroke-linecap="round">
     <path d="M256 152 C220 128 168 128 130 146 L130 372 C168 354 220 354 256 380 C292 354 344 354 382 372 L382 146 C344 128 292 128 256 152 Z"/>
     <line x1="256" y1="152" x2="256" y2="380"/>
   </g>
-  <path d="M366 96 l12 30 30 12 -30 12 -12 30 -12 -30 -30 -12 30 -12 z" fill="#f4ead8"/>
+  <path d="M366 96 l12 30 30 12 -30 12 -12 30 -12 -30 -30 -12 30 -12 z" fill="#e8eaf0"/>
 </svg>
