@@ -172,7 +172,6 @@ const CLASSES={
     tagline:"Arcane prepared caster · the widest spell list",
     tradition:"arcane", keyAbility:"Intelligence", keyAbilityShort:"Int",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
-    preview:true,
     features:[
       {type:"extraSlots", key:"school", icon:"school", label:"Arcane school slot",
        note:"One extra slot of each rank you can cast, which must hold a spell from your chosen school / curriculum."},
@@ -195,11 +194,10 @@ const CLASSES={
     tagline:"Primal prepared caster · nature's versatility",
     tradition:"primal", keyAbility:"Wisdom", keyAbilityShort:"Wis",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
-    preview:true,
     features:[{type:"note", title:"Druidic order", text:"Pick your order's focus spells (Heal Animal, Tempest Surge, Wild/Untamed Form…) in the Focus section below. Companion/familiar bookkeeping stays on your sheet."}],
     help:[
       ["What does a druid do?",
-       "You're a <b>Primal</b> prepared caster tied to nature, with strong healing, control, and battlefield spells. Many druids also use order focus spells to shapeshift (coming soon to the app)."],
+       "You're a <b>Primal</b> prepared caster tied to nature, with strong healing, control, and battlefield spells. Many druids also use order focus spells to shapeshift — add the ones you know in the Focus section."],
     ],
   },
 
@@ -210,11 +208,10 @@ const CLASSES={
     traditionFrom:"patron", defaultTradition:"occult",
     keyAbility:"Intelligence", keyAbilityShort:"Int",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
-    preview:true,
     features:[{type:"note", title:"Hexes & familiar", text:"Choose your patron's tradition above, then add your hex focus spells in the Focus section below. Familiar details stay on your sheet."}],
     help:[
       ["What does a witch do?",
-       "You're a prepared caster whose <b>patron</b> grants your magic — set your patron's <b>tradition</b> (arcane, divine, occult, or primal) in the character section, and your spell list follows. Witches also cast <b>hexes</b> through a familiar (coming soon)."],
+       "You're a prepared caster whose <b>patron</b> grants your magic — set your patron's <b>tradition</b> (arcane, divine, occult, or primal) in the character section, and your spell list follows. Witches also cast <b>hexes</b> — add your hex focus spells in the Focus section (your familiar stays on your sheet)."],
     ],
   },
 
@@ -224,7 +221,6 @@ const CLASSES={
     tagline:"Spontaneous caster · magic in the blood",
     traditionFrom:"bloodline", keyAbility:"Charisma", keyAbilityShort:"Cha",
     casting:"spontaneous", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
-    preview:true,
     features:[
       {type:"signature"},
       {type:"note", title:"Bloodline magic", text:"Add your bloodline focus spells in the Focus section below. Blood-magic side effects are described on each spell but tracked by you."},
@@ -243,14 +239,13 @@ const CLASSES={
     tagline:"Occult spontaneous caster · master of support",
     tradition:"occult", keyAbility:"Charisma", keyAbilityShort:"Cha",
     casting:"spontaneous", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
-    preview:true,
     features:[
       {type:"signature"},
       {type:"note", title:"Compositions & muse", text:"Add your composition focus spells (Courageous Anthem, Counter Performance…) in the Focus section below."},
     ],
     help:[
       ["What does a bard do?",
-       "You're an <b>Occult</b> <b>spontaneous</b> caster and the game's best supporter. You build a repertoire and cast flexibly, and your composition cantrips/focus spells buff the party (coming soon)."],
+       "You're an <b>Occult</b> <b>spontaneous</b> caster and the game's best supporter. You build a repertoire and cast flexibly, and your composition cantrips/focus spells buff the party — add them in the Focus section."],
       ["Signature spells",
        "Mark spells as <b>signature</b> (the ★) to heighten them with higher-rank slots. One per rank is the usual choice."],
     ],
@@ -262,14 +257,15 @@ const CLASSES={
     tagline:"Divine spontaneous caster · power at a price",
     tradition:"divine", keyAbility:"Charisma", keyAbilityShort:"Cha",
     casting:"spontaneous", slots:"full", prof:FULL_CASTER_PROF, cantrips:5,
-    preview:true,
     features:[
       {type:"signature"},
-      {type:"note", title:"Mystery & revelations", text:"Add your revelation focus spells in the Focus section below. Your escalating oracular curse is tracked on your sheet."},
+      {type:"stageTracker", key:"curse", icon:"oracle", label:"Oracular curse", max:4,
+       note:"Your curse deepens by a stage each time you use a cursebound action — stronger effects, worse drawbacks. Resting clears it."},
+      {type:"note", title:"Mystery & revelations", text:"Add your revelation focus spells in the Focus section below, and track your escalating oracular curse on Cast Today."},
     ],
     help:[
       ["What does an oracle do?",
-       "You're a <b>Divine</b> <b>spontaneous</b> caster channeling a <b>mystery</b>. You build a repertoire and cast flexibly; your revelation spells deepen an escalating <b>curse</b> (coming soon)."],
+       "You're a <b>Divine</b> <b>spontaneous</b> caster channeling a <b>mystery</b>. You build a repertoire and cast flexibly. Add your revelation focus spells in the Focus section; your escalating <b>curse</b> is tracked on your sheet."],
       ["Signature spells",
        "Mark spells as <b>signature</b> (the ★) to heighten them with higher-rank slots — usually one per spell rank."],
     ],
@@ -280,8 +276,12 @@ const CLASSES={
     tagline:"Arcane half-caster · blade and spell as one",
     tradition:"arcane", keyAbility:"Intelligence", keyAbilityShort:"Int",
     casting:"prepared", slots:"partial", prof:PARTIAL_CASTER_PROF, cantrips:5,
-    preview:true,
-    features:[{type:"note", title:"Spellstrike & conflux spells", text:"Add your conflux focus spells (Force Fang, etc.) in the Focus section. Spellstrike itself is a martial action recharged by Arcane Cascade — track it on your sheet. You have only a few spell slots, always in your top two ranks."}],
+    features:[
+      {type:"studiousSlots", key:"studious", minLevel:7, rank:2, count:2, label:"Studious spells",
+       spells:["gecko-grip","sure-strike","water-breathing"],
+       note:"From level 7, two extra 2nd-rank slots for utility spells only: Gecko Grip, Sure Strike, or Water Breathing — plus one spell from your hybrid study, which you add on your sheet."},
+      {type:"note", title:"Spellstrike & conflux spells", text:"Add your conflux focus spells (Force Fang, etc.) in the Focus section. Spellstrike itself is a martial action recharged by Arcane Cascade — track it on your sheet. Your main spell slots are always your top two ranks."},
+    ],
     help:[
       ["What does a magus do?",
        "You're a martial <b>Arcane</b> caster who fuses weapon strikes with spells via <b>Spellstrike</b>. You only get a <b>handful of spell slots</b> (always your two highest ranks), so each prepared spell is precious — often a damaging spell to channel through Spellstrike."],
@@ -299,7 +299,6 @@ const CLASSES={
     traditionChoiceHint:"your eidolon's essence sets your spell tradition",
     keyAbility:"Charisma", keyAbilityShort:"Cha",
     casting:"spontaneous", slots:"partial", prof:PARTIAL_CASTER_PROF, cantrips:5,
-    preview:true,
     features:[
       {type:"signature"},
       {type:"note", title:"Eidolon & shared life", text:"Choose your eidolon's tradition above and add evolution focus spells in the Focus section. You get only a few slots (top two ranks). Your shared HP pool and the eidolon's actions stay on your sheet."},
@@ -317,11 +316,12 @@ const CLASSES={
     id:"psychic", name:"Psychic", icon:"psychic", color:"#e05fa6",
     tagline:"Occult spontaneous caster · few spells, mighty cantrips",
     tradition:"occult", keyAbility:"Int or Cha", keyAbilityShort:"Key",
-    casting:"spontaneous", slots:"psychic", prof:FULL_CASTER_PROF, cantrips:5,
-    preview:true,
+    casting:"spontaneous", slots:"psychic", prof:FULL_CASTER_PROF, cantrips:3,
     features:[
       {type:"signature"},
-      {type:"note", title:"Psi cantrips, Amps & Unleash Psyche", text:"Your psi cantrips appear in the Focus section — cast them at will, and spend a Focus Point to Amp them (use Refocus to recover). Your spell DC uses Intelligence or Charisma, whichever your conscious mind chose. Unleash Psyche is tracked on your sheet."},
+      {type:"dailyResource", key:"unleash", icon:"psychic", label:"Unleash Psyche", uses:1, verb:"Unleash", recharge:"refocus",
+       note:"Surge your psyche for 2 rounds — bigger cantrips and better spell attacks. Afterward your mind is strained; Refocus to Unleash again."},
+      {type:"note", title:"Psi cantrips & Amps", text:"Your psi cantrips appear in the Focus section — cast them at will, or spend a Focus Point to Amp them (tap Amp). Refocus to recover points. Your spell DC uses Intelligence or Charisma, whichever your conscious mind chose."},
     ],
     help:[
       ["What does a psychic do?",
@@ -337,11 +337,10 @@ const CLASSES={
     tagline:"Divine prepared caster · channels apparitions (spirits)",
     tradition:"divine", keyAbility:"Wisdom", keyAbilityShort:"Wis",
     casting:"prepared", slots:"full", prof:FULL_CASTER_PROF, cantrips:4,
-    preview:true,
     features:[{type:"note", title:"Apparitions & vessel spells", text:"You prepare divine spells; your attuned apparitions grant a vessel focus spell (add the ones you know in the Focus section below) and a separate spontaneous repertoire of apparition spells that stays on your character sheet."}],
     help:[
       ["What does an animist do?",
-       "You're a <b>Divine</b> prepared caster who channels <b>apparitions</b> — spirits that lend you power. You prepare divine spells like a cleric, and your attuned apparitions grant extra spells plus a <b>vessel</b> focus spell. The app tracks your divine slots, cantrips and DC; apparition attunement and the apparition repertoire stay on your sheet (coming soon)."],
+       "You're a <b>Divine</b> prepared caster who channels <b>apparitions</b> — spirits that lend you power. You prepare divine spells like a cleric, and your attuned apparitions grant extra spells plus a <b>vessel</b> focus spell. The app tracks your divine slots, cantrips and DC; apparition attunement and the apparition repertoire stay on your character sheet."],
       ["Cantrips & apparitions",
        "You know <b>4 cantrips</b> — two you choose plus two granted by your attuned apparitions. Your <b>vessel</b> focus spell (from your primary apparition) appears in the Focus section; cast it with Focus Points like other focus spells."],
     ],

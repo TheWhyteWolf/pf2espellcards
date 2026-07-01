@@ -210,7 +210,9 @@ ok(ev("state.cast['focuspool']") === 1, "casting a focus spell spends a point");
 w.castFocus(2); w.castFocus(2);
 ok(ev("state.cast['focuspool']") === 2, "focus points cap at pool size");
 w.refocus();
-ok(ev("state.cast['focuspool']") === 0, "refocus restores all focus points");
+ok(ev("state.cast['focuspool']") === 1, "refocus recovers 1 focus point (RAW), not the whole pool");
+w.refocus();
+ok(ev("state.cast['focuspool']") === 0, "a second refocus recovers the next point");
 
 console.log("\n# FOCUS CANTRIP: Bard composition is at-will");
 w.chooseClass("bard");
@@ -308,6 +310,7 @@ ok(sumRepGroups.every(g => +g.dataset.reprank >= 3), "summoner L7 repertoire has
 console.log("\n# PSYCHIC (occult spontaneous, 2 slots/rank, full prof)");
 w.chooseClass("psychic");
 ok(w.activeTradition() === "occult" && w.isSpontaneous(), "psychic = occult spontaneous");
+ok(w.activeClass().cantrips === 3, "psychic knows 3 regular cantrips (the 3 psi cantrips live in the Focus section)");
 const psySlots = { 1:"{\"1\":1}", 4:"{\"1\":2,\"2\":2}", 5:"{\"1\":2,\"2\":2,\"3\":1}" };
 for (const [lvl, exp] of Object.entries(psySlots)) {
   ok(JSON.stringify(w.classSlots(+lvl)) === exp, `psychic slots L${lvl} = ${exp} (got ${JSON.stringify(w.classSlots(+lvl))})`);
@@ -323,14 +326,75 @@ w.chooseClass("animist");
 ok(!w.isSpontaneous() && w.activeClass().keyAbility === "Wisdom", "animist = prepared, Wisdom");
 ok(w.activeTradition() === "divine", "animist casts the divine tradition");
 ok(w.classSlots(1)[1] === 2 && w.classSlots(19)[10] === 1, "animist uses the full-caster slot table (2× rank 1 at L1; 10th rank at L19)");
+ok(w.activeClass().cantrips === 4, "animist prepares 4 cantrips (2 chosen + 2 from apparitions)");
 ev("state.level=19; state.keyMod=5;");
 ok(w.spellDC() === 42, `animist L19 DC = 42 (legendary full caster; got ${w.spellDC()})`);
 ok(w.hasFocus() && w.classFocusSpells().length > 0, `animist surfaces vessel/apparition focus spells (${w.classFocusSpells().length})`);
 ev("state.level=5"); w.go("prepare");
 ok(d.querySelectorAll(".slotSel").length > 0 && d.querySelectorAll(".repSel").length === 0, "animist prepares into slots, not a repertoire");
 
+console.log("\n# PSYCHIC: Amp psi cantrips + Unleash Psyche + refocus recharge");
+w.chooseClass("psychic"); ev("state.level=5; state.keyMod=4;");
+w.go("prepare");
+[...d.querySelectorAll(".cantripSel")].forEach(s=>{ const o=[...s.options].find(o=>o.value); if(o)s.value=o.value; });
+[...d.querySelectorAll('[data-reprank]')].forEach(group=>{ const r=+group.dataset.reprank; const sel=group.querySelector(".repSel"); const o=[...sel.options].find(o=>o.value&&w.findSpell(o.value).rank<=r); if(o)sel.value=o.value; });
+w.setFocusPool(2);
+const psiChk = d.querySelector('.focusChk[value="imaginary-weapon"]');
+ok(!!psiChk, "psi cantrip (Imaginary Weapon) available in the focus checklist");
+psiChk.checked = true;
+w.savePrep();
+const pToday = d.getElementById("todayContent").innerHTML;
+ok(/at will/.test(pToday) && /Amp \(1 pt\)/.test(pToday), "psi cantrip is at-will with an Amp (1 pt) button");
+ok(/Unleash Psyche/.test(pToday), "Unleash Psyche resource shown on Cast Today");
+w.castFocus(2);
+ok(ev("state.cast['focuspool']") === 1, "Amping a psi cantrip spends a focus point");
+w.doCast("resource:unleash", 1);
+ok(ev("state.cast['resource:unleash']") === 1, "Unleash Psyche marks its daily use");
+w.refocus();
+ok(ev("state.cast['focuspool']") === 0, "refocus recovers the spent focus point");
+ok((ev("state.cast['resource:unleash']")||0) === 0, "refocus also recharges Unleash Psyche (recharge:'refocus')");
+
+console.log("\n# ORACLE: cursebound stage tracker");
+w.chooseClass("oracle"); ev("state.level=5; state.keyMod=4;");
+w.go("prepare");
+[...d.querySelectorAll(".cantripSel")].forEach(s=>{ const o=[...s.options].find(o=>o.value); if(o)s.value=o.value; });
+[...d.querySelectorAll('[data-reprank]')].forEach(group=>{ const r=+group.dataset.reprank; const sel=group.querySelector(".repSel"); const o=[...sel.options].find(o=>o.value&&w.findSpell(o.value).rank<=r); if(o)sel.value=o.value; });
+w.savePrep();
+ok(/Oracular curse/.test(d.getElementById("todayContent").innerHTML), "oracle Today shows the curse stage tracker");
+w.stageUp("curse"); w.stageUp("curse");
+ok(ev("state.cast['stage:curse']") === 2, "curse stage increments");
+w.stageDown("curse");
+ok(ev("state.cast['stage:curse']") === 1, "curse stage decrements");
+w.stageUp("curse"); w.stageUp("curse"); w.stageUp("curse"); w.stageUp("curse");
+ok(ev("state.cast['stage:curse']") === 4, "curse stage caps at its max (4)");
+w.newDay();
+ok((ev("state.cast['stage:curse']")||0) === 0, "resting clears the curse stage");
+
+console.log("\n# MAGUS: Studious Spells (restricted utility slots, L7+)");
+w.chooseClass("magus"); ev("state.level=5; state.keyMod=4;");
+w.go("prepare");
+ok(d.querySelectorAll(".studiousSel").length === 0, "no studious slots before level 7");
+ev("state.level=7"); w.go("prepare");
+const studSel = [...d.querySelectorAll(".studiousSel")];
+ok(studSel.length === 2, "two studious slots at level 7");
+const studOpts = [...studSel[0].options].filter(o=>o.value).map(o=>o.value).sort();
+ok(JSON.stringify(studOpts) === JSON.stringify(["gecko-grip","sure-strike","water-breathing"]), "studious slots restricted to the utility list");
+[...d.querySelectorAll(".cantripSel")].forEach(s=>{ const o=[...s.options].find(o=>o.value); if(o)s.value=o.value; });
+[...d.querySelectorAll(".slotSel")].forEach(sel=>{ const r=+sel.dataset.rank; const o=[...sel.options].find(o=>o.value&&w.findSpell(o.value).rank<=r); if(o)sel.value=o.value; });
+studSel[0].value="sure-strike"; studSel[1].value="water-breathing";
+w.savePrep();
+ok(JSON.stringify(ev("state.prepared.studious.studious")) === JSON.stringify(["sure-strike","water-breathing"]), "studious selections saved");
+ok(/Studious spells/.test(d.getElementById("todayContent").innerHTML), "studious slots appear on Cast Today");
+
 console.log("\n# class picker now lists all 11");
 ok(ev("CLASS_ORDER.length") === 11, "class picker offers all 11 classes");
+ok(ev("CLASS_ORDER.every(id => !CLASSES[id].preview)"), "no class remains in preview mode (all fully released)");
+w.showClassPicker();
+ok(!/previewtag">preview/.test(d.getElementById("view-classpick").innerHTML), "class picker renders no 'preview' tags");
+{
+  w.chooseClass("magus"); w.go("prepare");
+  ok(d.getElementById("prepPreviewBanner").classList.contains("hide"), "Prepare view hides the preview banner for a released class");
+}
 
 console.log("\n# LEGACY / REMASTER compatibility");
 // every spell has a legacy array; aliases resolve to real spells

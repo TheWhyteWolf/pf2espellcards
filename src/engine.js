@@ -574,6 +574,9 @@ function renderPrepSummary(){
   getFeatures("dailyResource").forEach(f=>{
     extra+=`<div style="margin-top:4px">${iconSvg(f.icon)} ${f.label}: <b>${f.uses}×</b>/day</div>`;
   });
+  studiousFeats().forEach(f=>{
+    extra+=`<div style="margin-top:4px">${iconSvg("school")} ${f.label}: <b>${f.count}×</b> rank ${f.rank} (utility)</div>`;
+  });
   if(hasFocus()){
     extra+=`<div style="margin-top:4px">Focus pool: <b>${state.focusPool||1}</b> Focus Point${(state.focusPool||1)>1?"s":""} (focus spells heighten to rank ${focusRank()})</div>`;
   }
@@ -607,6 +610,7 @@ function renderPrepDynamic(){
   getFeatures("note").forEach(f=>{ html+=`<div class="banner"><b>${f.title}</b> — ${f.text}</div>`; });
   html+=cantripPicksHTML();
   html+= isSpontaneous() ? repertoireHTML() : preparedSlotsHTML();
+  if(!isSpontaneous()) html+=studiousSlotsHTML();
   if(hasFocus()) html+=focusPicksHTML();
   document.getElementById("prepDynamic").innerHTML=html;
 }
@@ -708,6 +712,33 @@ function preparedSlotsHTML(){
   return html;
 }
 
+/* Studious spells (magus, level 7+): a couple of extra fixed-rank slots that can
+   only hold a short list of utility spells. Restricted <select> so the app stays
+   honest about what's legal in these slots. */
+function studiousFeats(){ return getFeatures("studiousSlots").filter(f=>Number(state.level)>=(f.minLevel||1)); }
+function studiousSlotsHTML(){
+  const feats=studiousFeats(); if(!feats.length) return "";
+  const prevAll=(state.prepared&&state.prepared.studious)||{};
+  let html="";
+  feats.forEach(f=>{
+    const prev=prevAll[f.key]||[];
+    const opts=(f.spells||[]).map(findSpell).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
+    html+=`<div class="slotgroup"><h3>${f.label} <span class="count" style="font-weight:600;color:var(--muted)">(${f.count} × rank ${f.rank}, utility only)</span></h3>
+      <p class="meta">${escapeHtml(f.note||"")}</p>`;
+    for(let i=0;i<f.count;i++){
+      const sel=prev[i]||"", pid="stud_"+f.key+"_"+i;
+      const optionHtml=`<option value="">— choose —</option>`+
+        opts.map(s=>`<option value="${s.slug}" ${s.slug===sel?"selected":""}>${escapeHtml(s.name)}</option>`).join("");
+      html+=`<div class="prep-slot">
+        <div class="slotrow"><div class="num">${iconSvg("school")}</div>
+        <select class="studiousSel" data-key="${f.key}" data-castrank="${f.rank}" data-preview="${pid}" onchange="updatePreview(this)">${optionHtml}</select></div>
+        <div class="prep-preview" id="${pid}">${spellPreviewHTML(findSpell(sel),f.rank)}</div></div>`;
+    }
+    html+=`</div>`;
+  });
+  return html;
+}
+
 let repUID=0;
 function repRowHTML(rank, sel, sig){
   const pid="rprev"+(repUID++);
@@ -771,8 +802,11 @@ function savePrep(){
     document.querySelectorAll(".slotSel").forEach(sel=>{ const r=sel.dataset.rank; (slots[r]=slots[r]||[]).push(sel.value); });
     const extra={};
     document.querySelectorAll(".extraSel").forEach(sel=>{ const k=sel.dataset.key,r=sel.dataset.rank; extra[k]=extra[k]||{}; (extra[k][r]=extra[k][r]||[]).push(sel.value); });
+    const studious={};
+    document.querySelectorAll(".studiousSel").forEach(sel=>{ const k=sel.dataset.key; (studious[k]=studious[k]||[]).push(sel.value); });
     const hr=highestRank(state.level);
     state.prepared={ type:"prepared", cantrips, slots, extra };
+    if(Object.keys(studious).length) state.prepared.studious=studious;
     if(hasFeature("divineFont")){
       const feat=getFeature("divineFont");
       state.prepared.divineFont={ font:state.font, fontName:state.font==="heal"?"Heal":"Harm",
@@ -804,13 +838,33 @@ function dailyResourceHTML(){
     const spent=state.cast[key]||0, remaining=f.uses-spent, done=remaining<=0;
     let pips=""; for(let k=0;k<f.uses;k++){ pips+=`<span class="pip ${k<remaining?"full":"spent"}"></span>`; }
     const btn=done?`<button class="castbtn zero" onclick="uncast('${key}')">↩ undo</button>`
-                  :`<button class="castbtn" onclick="doCast('${key}',${f.uses})">Use</button>`;
+                  :`<button class="castbtn" onclick="doCast('${key}',${f.uses})">${f.verb||"Use"}</button>`;
     html+=`<div class="cast-card ${done?"spent":""}">
       <div class="cast-top"><div class="nm">${iconSvg(f.icon)} ${f.label}</div><div class="uses">${pips} ${btn}</div></div>
       <div class="meta">${escapeHtml(f.note||"")}</div></div>`;
   });
   return html;
 }
+
+/* Escalating-stage tracker (e.g. the oracle's cursebound curse). A simple
+   0..max stepper that persists in state.cast and resets on a new day. */
+function stageTrackerHTML(){
+  let html="";
+  getFeatures("stageTracker").forEach(f=>{
+    const k="stage:"+f.key;
+    const cur=Math.max(0, Math.min(f.max, state.cast[k]||0));
+    let pips=""; for(let i=1;i<=f.max;i++){ pips+=`<span class="pip ${i<=cur?"full":"spent"}"></span>`; }
+    html+=`<div class="cast-card">
+      <div class="cast-top"><div class="nm">${iconSvg(f.icon)} ${f.label} <span class="meta">stage ${cur} / ${f.max}</span></div>
+      <div class="uses">${pips}
+        <button class="castbtn zero" onclick="stageDown('${f.key}')" ${cur<=0?"disabled":""} aria-label="lower ${escapeHtml(f.label)} stage">−</button>
+        <button class="castbtn" onclick="stageUp('${f.key}')" ${cur>=f.max?"disabled":""} aria-label="raise ${escapeHtml(f.label)} stage">+</button></div></div>
+      <div class="meta">${escapeHtml(f.note||"")}</div></div>`;
+  });
+  return html;
+}
+function stageUp(key){ const f=getFeatures("stageTracker").find(x=>x.key===key); if(!f) return; const k="stage:"+key; state.cast[k]=Math.min(f.max,(state.cast[k]||0)+1); saveState(); renderToday(); }
+function stageDown(key){ const k="stage:"+key; state.cast[k]=Math.max(0,(state.cast[k]||0)-1); saveState(); renderToday(); }
 
 function renderToday(){
   renderHeader();
@@ -834,15 +888,26 @@ function focusSectionHTML(p){
   const refocus=`<button class="castbtn ${spent>0?"":"zero"}" ${spent>0?"":"disabled"} style="margin-left:8px" onclick="refocus()">↻ Refocus</button>`;
   let html=`<div class="sectionhead">Focus spells <span class="count">${remaining}/${pool} point${pool>1?"s":""}</span></div>
     <div style="margin:2px 0 8px"><span class="uses">${pips}${refocus}</span></div><div class="divider"></div>`;
+  const psychic = !!(activeClass() && activeClass().id==="psychic");
   f.spells.forEach((slug,i)=>{
     const s=findSpell(slug); if(!s) return;
     const atWill = s.rank===0;
     const out = !atWill && remaining<=0;
     const castRank=fr;
     const heightNote=(castRank>s.rank)?`<span class="meta"> · ↑ heightened to rank ${castRank}</span>`:"";
-    const btn = atWill ? `<span class="unlim">∞ at will</span>`
-              : (out ? `<button class="castbtn zero" disabled>No points</button>`
-                     : `<button class="castbtn" onclick="castFocus(${pool})">Cast</button>`);
+    // Psychic psi cantrips are free at will, but can be Amped by spending a Focus Point.
+    let btn;
+    if(atWill && psychic){
+      const amp = remaining>0
+        ? `<button class="castbtn" onclick="castFocus(${pool})" title="Amp — spend 1 Focus Point">Amp (1 pt)</button>`
+        : `<button class="castbtn zero" disabled>No points</button>`;
+      btn = `<span class="unlim">∞ at will</span> ${amp}`;
+    } else if(atWill){
+      btn = `<span class="unlim">∞ at will</span>`;
+    } else {
+      btn = out ? `<button class="castbtn zero" disabled>No points</button>`
+                : `<button class="castbtn" onclick="castFocus(${pool})">Cast</button>`;
+    }
     const detailsId="f_"+i;
     html+=`<div class="cast-card ${out?"spent":""}" style="border-left-color:var(--accent)">
       <div class="cast-top"><div class="nm">${escapeHtml(s.name)} ${heightNote}</div><div class="uses">${btn}</div></div>
@@ -853,11 +918,17 @@ function focusSectionHTML(p){
   return html;
 }
 function castFocus(pool){ const key="focuspool"; state.cast[key]=Math.min(pool,(state.cast[key]||0)+1); saveState(); renderToday(); }
-function refocus(){ state.cast["focuspool"]=0; saveState(); renderToday(); toast("Refocused"); }
+function refocus(){
+  const key="focuspool"; state.cast[key]=Math.max(0,(state.cast[key]||0)-1);
+  // Some resources (e.g. the psychic's Unleash Psyche) recharge when you Refocus.
+  getFeatures("dailyResource").forEach(f=>{ if(f.recharge==="refocus") delete state.cast["resource:"+f.key]; });
+  saveState(); renderToday(); toast("Refocused — +1 Focus Point");
+}
 
 function renderTodayPrepared(p){
   let html=todayHeaderHTML();
   html+=dailyResourceHTML();
+  html+=stageTrackerHTML();
 
   if(p.divineFont){
     const f=p.divineFont; const fontSpell=findSpell(f.fontSlug);
@@ -880,12 +951,19 @@ function renderTodayPrepared(p){
     (p.slots[r]||[]).forEach((slug,i)=>{ if(!slug) return; const s=findSpell(slug); if(!s) return; html+=castableCard(s,"slot",r,1,r,i); });
     extras.forEach(({f,slug})=>{ const s=findSpell(slug); if(!s) return; html+=castableCard(s,"extra_"+f.key,r,1,r,0,{label:f.icon}); });
   });
+  studiousFeats().forEach(f=>{
+    const arr=((p.studious&&p.studious[f.key])||[]).filter(Boolean);
+    if(!arr.length) return;
+    html+=`<div class="sectionhead">${f.label} <span class="count">${arr.length} slot${arr.length>1?"s":""}</span></div><div class="divider"></div>`;
+    arr.forEach((slug,i)=>{ const s=findSpell(slug); if(!s) return; html+=castableCard(s,"studious",f.rank,1,f.rank,i,{label:"school"}); });
+  });
   return html;
 }
 
 function renderTodaySpontaneous(p){
   let html=todayHeaderHTML();
   html+=dailyResourceHTML();
+  html+=stageTrackerHTML();
 
   if(p.cantrips && p.cantrips.length){
     html+=`<div class="sectionhead">Cantrips <span class="count">unlimited</span></div><div class="divider"></div>`;
