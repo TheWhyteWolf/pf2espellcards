@@ -166,6 +166,8 @@ button{font-family:inherit;font-size:1.05rem;cursor:pointer;}
 }
 .btn.secondary{background:var(--surface-2);color:var(--accent-text);border:1px solid var(--accent-dim);box-shadow:none;}
 .btn:active{transform:translateY(1px);}
+a.btn{display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;text-align:center;}
+a.btn .icn{width:1.15em;height:1.15em;}
 .linklike{background:none;border:none;color:var(--info);font-weight:700;text-decoration:underline;padding:0;font-size:inherit;}
 
 label.field{display:block;margin:14px 0;}
