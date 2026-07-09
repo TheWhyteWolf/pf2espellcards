@@ -76,6 +76,21 @@ curse, companions/familiars).
 
 ## Using it
 
+### Quick start (npm)
+
+With [Node.js](https://nodejs.org) installed:
+
+```sh
+npx pf2e-spellbook
+```
+
+That downloads the latest release, serves it at `http://localhost:8724`, and opens
+your browser. Characters are saved in that browser (per origin), so they survive
+package updates. `--port N` picks another port (a different port is a different
+origin, i.e. a separate set of characters); `--no-open` skips the browser launch.
+
+### The HTML file itself
+
 Open `dist/index.html` in any browser — no server, no install, works offline. State
 is saved in the browser's localStorage per device.
 

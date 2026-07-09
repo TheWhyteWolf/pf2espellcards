@@ -1,6 +1,6 @@
 {
   "name": "pf2e-spellbook",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "Interactive Pathfinder 2e spellbook (single self-contained HTML).",
   "keywords": [
     "pathfinder",
@@ -20,7 +20,14 @@
   "author": "Whyte",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
+  "bin": {
+    "pf2e-spellbook": "bin/cli.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "files": [
+    "bin/",
     "src/",
     "tools/",
     "data/",
